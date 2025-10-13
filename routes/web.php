@@ -1,10 +1,11 @@
 <?php
 
-use App\Http\Controllers\ProfileController;
-use Illuminate\Foundation\Application;
-use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
+use Illuminate\Support\Facades\Route;
+use Illuminate\Foundation\Application;
+use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\Kasir\ProductController;
 
 Route::get('/', function () {
     return Inertia::render('Welcome', [
@@ -23,6 +24,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     Route::middleware(['role:kasir'])->group(function () {
         Route::get('/kasir/dashboard', [DashboardController::class, 'kasir'])->name('kasir.dashboard');
+        Route::resource('kasir/products', ProductController::class)->name('products.index', 'products.store', 'products.update', 'products.destroy');
     });
 
     Route::middleware(['role:karyawan'])->group(function () {

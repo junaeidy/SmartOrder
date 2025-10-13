@@ -1,11 +1,10 @@
 import { Link, usePage } from "@inertiajs/react";
-import { Home, Users, ClipboardList, ShoppingCart, Settings } from "lucide-react";
+import { Home, Users, ClipboardList, ShoppingCart, Settings, Donut } from "lucide-react";
 
 export default function Sidebar() {
   const { auth } = usePage().props;
   const role = auth?.user?.role;
 
-  // Menu berdasarkan role
   const menus = {
     owner: [
       { label: "Dashboard", icon: <Home size={18} />, href: "/owner/dashboard" },
@@ -17,6 +16,7 @@ export default function Sidebar() {
       { label: "Dashboard", icon: <Home size={18} />, href: "/kasir/dashboard" },
       { label: "Transaksi", icon: <ShoppingCart size={18} />, href: "/kasir/transaksi" },
       { label: "Riwayat", icon: <ClipboardList size={18} />, href: "/kasir/riwayat" },
+      { label: "Produk", icon: <Donut size={18} />, href: route("products.index") },
     ],
     karyawan: [
       { label: "Dashboard", icon: <Home size={18} />, href: "/karyawan/dashboard" },
