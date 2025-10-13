@@ -17,10 +17,15 @@ class User extends Authenticatable
      *
      * @var list<string>
      */
+    const ROLE_OWNER = 'owner';
+    const ROLE_KASIR = 'kasir';
+    const ROLE_KARYAWAN = 'karyawan';
+
     protected $fillable = [
         'name',
         'email',
         'password',
+        'role',
     ];
 
     /**
@@ -44,5 +49,20 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
         ];
+    }
+
+    public function isOwner()
+    {
+        return $this->role === self::ROLE_OWNER;
+    }
+
+    public function isKasir()
+    {
+        return $this->role === self::ROLE_KASIR;
+    }
+
+    public function isKaryawan()
+    {
+        return $this->role === self::ROLE_KARYAWAN;
     }
 }
