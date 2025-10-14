@@ -2,8 +2,17 @@ import { Link, usePage } from "@inertiajs/react";
 import { Home, Users, ClipboardList, ShoppingCart, Settings, Donut } from "lucide-react";
 
 export default function Sidebar() {
+  const { url } = usePage();
   const { auth } = usePage().props;
   const role = auth?.user?.role;
+
+  const getLinkPath = (href) => {
+    try {
+      return new URL(href).pathname;
+    } catch (e) {
+      return href;
+    }
+  };
 
   const menus = {
     owner: [
@@ -25,6 +34,9 @@ export default function Sidebar() {
   };
 
   const activeRoleMenus = menus[role] || [];
+  
+  const currentUrl = url || ''; 
+  const currentPath = currentUrl.endsWith('/') && currentUrl.length > 1 ? currentUrl.slice(0, -1) : currentUrl;
 
   return (
     <div className="w-64 bg-white h-screen shadow-lg flex flex-col justify-between fixed left-0 top-0 border-r">
@@ -33,16 +45,27 @@ export default function Sidebar() {
           🍽️ SmartOrder
         </div>
         <nav className="mt-4 flex flex-col space-y-1">
-          {activeRoleMenus.map((item, index) => (
-            <Link
-              key={index}
-              href={item.href}
-              className="flex items-center gap-2 px-4 py-2 text-gray-700 hover:bg-amber-100 hover:text-amber-700 transition rounded-md"
-            >
-              {item.icon}
-              <span>{item.label}</span>
-            </Link>
-          ))}
+          {activeRoleMenus.map((item, index) => {
+            const itemPath = getLinkPath(item.href);
+            const isActive = currentPath === itemPath;
+
+            return (
+              <Link
+                key={index}
+                href={item.href}
+                className={`
+                  flex items-center gap-2 px-4 py-2 transition rounded-md
+                  ${isActive 
+                    ? "bg-amber-500 text-white shadow-md hover:bg-amber-600"
+                    : "text-gray-700 hover:bg-amber-100 hover:text-amber-700"
+                  }
+                `}
+              >
+                {item.icon}
+                <span>{item.label}</span>
+              </Link>
+            );
+          })}
         </nav>
       </div>
 
