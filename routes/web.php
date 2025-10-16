@@ -6,14 +6,25 @@ use Illuminate\Foundation\Application;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\Kasir\ProductController;
+use App\Http\Controllers\CheckoutController;
+use App\Models\QueueCounter;
+use Carbon\Carbon;
+use Illuminate\Support\Facades\Artisan;
 
-Route::get('/', function () {
-    return Inertia::render('Welcome', [
-        'canLogin' => Route::has('login'),
-        'canRegister' => Route::has('register'),
-        'laravelVersion' => Application::VERSION,
-        'phpVersion' => PHP_VERSION,
-    ]);
+Route::get('/', [App\Http\Controllers\ProductController::class, 'index'])
+    ->middleware('guest')
+    ->name('welcome');
+    
+Route::get('/checkout', [CheckoutController::class, 'checkout'])
+    ->name('checkout');
+    
+Route::post('/checkout/process', [CheckoutController::class, 'process'])
+    ->name('checkout.process');
+    
+// Admin route to manually reset the queue counter (protected by admin middleware in production)
+Route::get('/admin/reset-queue', function() {
+    Artisan::call('queue:reset-counter');
+    return redirect()->back()->with('message', 'Queue counter has been reset successfully.');
 });
 
 Route::middleware(['auth', 'verified'])->group(function () {
@@ -29,6 +40,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     Route::middleware(['role:karyawan'])->group(function () {
         Route::get('/karyawan/dashboard', [DashboardController::class, 'karyawan'])->name('karyawan.dashboard');
+        Route::get('/karyawan/orders', [App\Http\Controllers\KaryawanOrderController::class, 'index'])->name('karyawan.orders');
+        Route::put('/karyawan/orders/{transaction}', [App\Http\Controllers\KaryawanOrderController::class, 'processOrder'])->name('karyawan.orders.process');
     });
 });
 
