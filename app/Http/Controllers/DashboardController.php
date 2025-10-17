@@ -16,39 +16,53 @@ class DashboardController extends Controller
     {
         $startOfToday = now()->startOfDay();
         $endOfToday = now()->endOfDay();
+        $paidStatuses = ['paid', 'settlement', 'capture'];
 
         // Fetch today's relevant transactions (waiting or completed)
         $todayTx = \App\Models\Transaction::whereBetween('created_at', [$startOfToday, $endOfToday])
             ->whereIn('status', ['waiting', 'completed'])
             ->get();
 
-        $todayRevenue = $todayTx->sum('total_amount');
+        // Paid-only collection for revenue-related metrics
+        $todayTxPaid = $todayTx->filter(function($tx) use ($paidStatuses) {
+            return in_array(strtolower((string)$tx->payment_status), $paidStatuses);
+        });
+
+        // Revenue should include only paid/settlement/capture
+        $todayRevenue = $todayTxPaid->sum('total_amount');
         $todayOrders = $todayTx->count();
         $pendingCount = \App\Models\Transaction::where('status', 'waiting')->count();
         $completedToday = \App\Models\Transaction::where('status', 'completed')
             ->whereBetween('created_at', [$startOfToday, $endOfToday])
             ->count();
 
-        $avgOrderValueToday = $todayOrders > 0 ? round($todayRevenue / $todayOrders) : 0;
+        // Average order value based on paid orders (to match paid-only revenue)
+        $paidOrdersCount = $todayTxPaid->count();
+        $avgOrderValueToday = $paidOrdersCount > 0 ? round($todayRevenue / $paidOrdersCount) : 0;
 
         // Payment method breakdown (today) - rename 'midtrans' to 'online'
-        $paymentBreakdown = $todayTx->groupBy('payment_method')->map(function($group, $method) {
+        $paymentBreakdown = $todayTx->groupBy('payment_method')->map(function($group, $method) use ($paidStatuses) {
             $label = $method === 'midtrans' ? 'online' : ($method ?: 'unknown');
+            // Revenue within the method should count only paid statuses
+            $groupPaidRevenue = $group->filter(function($tx) use ($paidStatuses) {
+                return in_array(strtolower((string)$tx->payment_status), $paidStatuses);
+            })->sum('total_amount');
             return [
                 'method' => $label,
                 'orders' => $group->count(),
-                'revenue' => $group->sum('total_amount'),
+                'revenue' => $groupPaidRevenue,
             ];
         })->values();
 
         // Hourly orders for today
         $hours = collect(range(0, 23));
-        $ordersByHour = $hours->map(function($h) use ($todayTx) {
+        $ordersByHour = $hours->map(function($h) use ($todayTx, $paidStatuses) {
             $count = $todayTx->filter(function($tx) use ($h) {
                 return $tx->created_at ? ((int)$tx->created_at->format('G') === (int)$h) : false;
             })->count();
-            $revenue = $todayTx->filter(function($tx) use ($h) {
-                return $tx->created_at ? ((int)$tx->created_at->format('G') === (int)$h) : false;
+            $revenue = $todayTx->filter(function($tx) use ($h, $paidStatuses) {
+                if (!$tx->created_at || ((int)$tx->created_at->format('G') !== (int)$h)) return false;
+                return in_array(strtolower((string)$tx->payment_status), $paidStatuses);
             })->sum('total_amount');
             return [
                 'hour' => sprintf('%02d:00', $h),
@@ -62,9 +76,13 @@ class DashboardController extends Controller
         $tx7 = \App\Models\Transaction::whereBetween('created_at', [$start7, $endOfToday])
             ->whereIn('status', ['waiting', 'completed'])
             ->get();
+        $tx7Paid = $tx7->filter(function($tx) use ($paidStatuses) {
+            return in_array(strtolower((string)$tx->payment_status), $paidStatuses);
+        });
         $days = collect(range(0, 6))->map(function($i) use ($start7) { return $start7->copy()->addDays($i); });
-        $last7Days = $days->map(function($day) use ($tx7) {
-            $revenue = $tx7->filter(function($tx) use ($day) {
+        $last7Days = $days->map(function($day) use ($tx7, $tx7Paid) {
+            // Revenue should be paid-only per day
+            $revenue = $tx7Paid->filter(function($tx) use ($day) {
                 return $tx->created_at ? $tx->created_at->isSameDay($day) : false;
             })->sum('total_amount');
             $orders = $tx7->filter(function($tx) use ($day) {

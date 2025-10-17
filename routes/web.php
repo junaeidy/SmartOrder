@@ -54,6 +54,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::middleware(['role:kasir'])->group(function () {
         Route::get('/kasir/dashboard', [DashboardController::class, 'kasir'])->name('kasir.dashboard');
         Route::resource('kasir/products', ProductController::class)->name('products.index', 'products.store', 'products.update', 'products.destroy');
+        // Reports
+        Route::get('/kasir/reports', [App\Http\Controllers\ReportsController::class, 'index'])->name('kasir.reports');
+        Route::get('/kasir/reports/export/excel', [App\Http\Controllers\ReportsController::class, 'exportExcel'])->name('kasir.reports.export.excel');
+        Route::get('/kasir/reports/export/pdf', [App\Http\Controllers\ReportsController::class, 'exportPdf'])->name('kasir.reports.export.pdf');
     });
 
     Route::middleware(['role:karyawan'])->group(function () {
