@@ -8,6 +8,7 @@ const Checkout = ({ products }) => {
     const [cartItems, setCartItems] = useState({});
     const [orderNotes, setOrderNotes] = useState('');
     const [loading, setLoading] = useState(false);
+    const [paymentMethod, setPaymentMethod] = useState('cash'); // Default to cash
 
     useEffect(() => {
         // Load customer data and cart items from session storage
@@ -48,7 +49,8 @@ const Checkout = ({ products }) => {
         router.post('/checkout/process', {
             customerData,
             cartItems,
-            orderNotes
+            orderNotes,
+            paymentMethod
         }, {
             onSuccess: () => {
                 // Clear cart after successful checkout
@@ -143,15 +145,34 @@ const Checkout = ({ products }) => {
                                     <h2 className="text-xl font-bold text-white">Payment Method</h2>
                                 </div>
                                 
-                                <div className="bg-gray-700 rounded-lg p-4 flex items-center">
-                                    <div className="h-5 w-5 rounded-full bg-orange-500 mr-3 flex items-center justify-center">
-                                        <div className="h-2 w-2 bg-white rounded-full"></div>
+                                <div 
+                                    className={`bg-gray-700 rounded-lg p-4 flex items-center mb-3 cursor-pointer ${paymentMethod === 'cash' ? 'ring-2 ring-orange-500' : ''}`}
+                                    onClick={() => setPaymentMethod('cash')}
+                                >
+                                    <div className="h-5 w-5 rounded-full bg-gray-600 mr-3 flex items-center justify-center">
+                                        {paymentMethod === 'cash' && (
+                                            <div className="h-2 w-2 bg-orange-500 rounded-full"></div>
+                                        )}
                                     </div>
                                     <span className="text-white font-medium">Cash Payment</span>
                                 </div>
                                 
+                                <div 
+                                    className={`bg-gray-700 rounded-lg p-4 flex items-center cursor-pointer ${paymentMethod === 'midtrans' ? 'ring-2 ring-orange-500' : ''}`}
+                                    onClick={() => setPaymentMethod('midtrans')}
+                                >
+                                    <div className="h-5 w-5 rounded-full bg-gray-600 mr-3 flex items-center justify-center">
+                                        {paymentMethod === 'midtrans' && (
+                                            <div className="h-2 w-2 bg-orange-500 rounded-full"></div>
+                                        )}
+                                    </div>
+                                    <span className="text-white font-medium">Online Payment</span>
+                                </div>
+                                
                                 <p className="text-gray-400 text-sm mt-4">
-                                    Pay after your order is confirmed and prepared.
+                                    {paymentMethod === 'cash' 
+                                        ? 'Pay after your order is confirmed and prepared.'
+                                        : 'Pay securely online with various payment methods (credit/debit card, e-wallet, bank transfer, etc.).'}
                                 </p>
                             </div>
                         </div>
@@ -164,7 +185,8 @@ const Checkout = ({ products }) => {
                                     <h2 className="text-xl font-bold text-white">Order Summary</h2>
                                 </div>
                                 
-                                <div className="space-y-4 mb-6">
+                                {/* Scrollable items list to handle many cart items without stretching the page */}
+                                <div className="space-y-4 mb-6 max-h-64 sm:max-h-80 lg:max-h-[50vh] overflow-y-auto pr-2">
                                     {Object.entries(cartItems).map(([productId, quantity]) => {
                                         const product = products.find(p => p.id == productId);
                                         if (!product) return null;

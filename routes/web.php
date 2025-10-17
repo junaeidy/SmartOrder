@@ -21,6 +21,24 @@ Route::get('/checkout', [CheckoutController::class, 'checkout'])
 Route::post('/checkout/process', [CheckoutController::class, 'process'])
     ->name('checkout.process');
     
+Route::get('/thankyou/{transaction}', [CheckoutController::class, 'thankyou'])
+    ->name('checkout.thankyou');
+
+// Midtrans Routes
+Route::post('/midtrans/notification', [App\Http\Controllers\MidtransController::class, 'notification'])
+    ->name('midtrans.notification');
+    
+Route::get('/midtrans/status/{orderId}', [App\Http\Controllers\MidtransController::class, 'checkStatus'])
+    ->name('midtrans.check-status');
+    
+Route::get('/midtrans/finish', [App\Http\Controllers\MidtransController::class, 'finish'])
+    ->name('midtrans.finish');
+
+Route::prefix('api')->group(function () {
+    Route::get('/payment/check-status/{orderId}', [App\Http\Controllers\MidtransController::class, 'checkStatus'])
+        ->name('payment.check.status');
+});
+    
 // Admin route to manually reset the queue counter (protected by admin middleware in production)
 Route::get('/admin/reset-queue', function() {
     Artisan::call('queue:reset-counter');

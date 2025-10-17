@@ -17,6 +17,12 @@ return Application::configure(basePath: dirname(__DIR__))
             \Illuminate\Http\Middleware\AddLinkHeadersForPreloadedAssets::class,
         ]);
 
+        // Exempt Midtrans webhook endpoints from CSRF verification
+        $middleware->validateCsrfTokens(except: [
+            '/midtrans/notification',
+            '/midtrans/finish',
+        ]);
+
         $middleware->alias([
             'role' => RoleMiddleware::class,
         ]);

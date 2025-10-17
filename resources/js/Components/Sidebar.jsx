@@ -28,8 +28,8 @@ export default function Sidebar() {
       { label: "Produk", icon: <Donut size={18} />, href: route("products.index") },
     ],
     karyawan: [
-      { label: "Dashboard", icon: <Home size={18} />, href: "/karyawan/dashboard" },
-      { label: "Pesanan", icon: <ShoppingCart size={18} />, href: "/karyawan/pesanan" },
+      { label: "Dashboard", icon: <Home size={18} />, href: route("karyawan.dashboard") },
+      { label: "Pesanan", icon: <ShoppingCart size={18} />, href: route("karyawan.orders") },
     ],
   };
 

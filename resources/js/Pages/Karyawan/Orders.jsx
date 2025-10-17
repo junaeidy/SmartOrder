@@ -24,7 +24,10 @@ const Orders = ({ pendingOrders, completedOrders, auth }) => {
         const channel = window.Echo.channel('orders');
         
         channel.listen('NewOrderReceived', (e) => {
-            setOrders(prev => [...prev, e.transaction]);
+            setOrders(prev => {
+                const exists = prev.some(o => o.id === e.transaction.id);
+                return exists ? prev : [...prev, e.transaction];
+            });
             
             const audio = new Audio('/sounds/notification.wav');
             audio.volume = 0.8;

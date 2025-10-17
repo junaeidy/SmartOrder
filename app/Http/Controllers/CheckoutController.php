@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Product;
 use App\Models\Transaction;
 use App\Models\QueueCounter;
+use App\Services\MidtransService;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Illuminate\Support\Facades\Mail;
@@ -15,6 +16,13 @@ use Carbon\Carbon;
 
 class CheckoutController extends Controller
 {
+    protected $midtransService;
+    
+    public function __construct(MidtransService $midtransService)
+    {
+        $this->midtransService = $midtransService;
+    }
+    
     public function checkout(Request $request)
     {
         return Inertia::render('Checkout', [
@@ -38,6 +46,7 @@ class CheckoutController extends Controller
             'customerData.whatsapp' => 'required|string',
             'customerData.email' => 'required|email',
             'cartItems' => 'required|array',
+            'paymentMethod' => 'required|string|in:cash,midtrans',
         ]);
 
         $customerData = $request->customerData;
@@ -73,6 +82,10 @@ class CheckoutController extends Controller
         $queueNumber = $this->generateQueueNumber();
         $kodeTransaksi = $this->generateKodeTransaksi();
 
+        $paymentMethod = $request->paymentMethod;
+        $initialStatus = ($paymentMethod === 'cash') ? 'waiting' : 'waiting_for_payment';
+        $paymentStatus = ($paymentMethod === 'cash') ? 'paid' : 'pending';
+        
         $transaction = Transaction::create([
             'kode_transaksi' => $kodeTransaksi,
             'customer_name' => $customerData['nama'],
@@ -81,12 +94,38 @@ class CheckoutController extends Controller
             'customer_notes' => $request->orderNotes ?? null,
             'total_amount' => $totalAmount,
             'total_items' => $totalItems,
-            'payment_method' => 'cash',
+            'payment_method' => $paymentMethod,
+            'payment_status' => $paymentStatus,
             'queue_number' => $queueNumber,
-            'status' => 'waiting',
+            'status' => $initialStatus,
             'items' => $processedItems,
         ]);
 
+        // If payment method is midtrans, create payment transaction
+        if ($paymentMethod === 'midtrans') {
+            $midtransResponse = $this->midtransService->createTransaction($transaction);
+            
+            if (!$midtransResponse['success']) {
+                // Handle payment creation failure
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Failed to create payment: ' . $midtransResponse['message']
+                ], 500);
+            }
+            
+            // Debug the response
+            \Illuminate\Support\Facades\Log::info('Midtrans Response:', $midtransResponse);
+            
+            // Return payment details
+            return Inertia::render('PaymentMidtrans', [
+                'transaction' => $transaction,
+                'snapToken' => $midtransResponse['snap_token'],
+                'clientKey' => env('MIDTRANS_CLIENT_KEY', config('midtrans.client_key')),
+                'redirectUrl' => $midtransResponse['redirect_url']
+            ]);
+        }
+
+        // For cash payments, proceed normally
         // Send email confirmation
         try {
             Mail::to($customerData['email'])->send(new OrderConfirmation($transaction));
@@ -96,6 +135,16 @@ class CheckoutController extends Controller
         
         // Broadcast the new order event for real-time updates
         event(new NewOrderReceived($transaction));
+
+        return Inertia::render('ThankYou', [
+            'transaction' => $transaction,
+        ]);
+    }
+
+    public function thankyou(Transaction $transaction)
+    {
+        // No need to load 'items' as it's a cast attribute, not a relationship
+        // The items will be automatically available from the items JSON column
 
         return Inertia::render('ThankYou', [
             'transaction' => $transaction,

@@ -14,6 +14,9 @@ class Kernel extends ConsoleKernel
     {
         // Reset queue counter every day at midnight
         $schedule->command('queue:reset-counter')->dailyAt('00:00');
+        
+        // Check pending payments every 15 minutes
+        $schedule->command('payments:check-pending')->everyFifteenMinutes();
     }
 
     /**

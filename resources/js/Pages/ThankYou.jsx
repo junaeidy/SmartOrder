@@ -1,6 +1,6 @@
 import { Head } from '@inertiajs/react';
-import React, { useEffect } from 'react';
-import { CheckCircle, ShoppingBag, Home, Printer } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { CheckCircle, ShoppingBag, Home, Printer, CreditCard } from 'lucide-react';
 import { router } from '@inertiajs/react';
 
 const ThankYou = ({ transaction }) => {
@@ -26,12 +26,27 @@ const ThankYou = ({ transaction }) => {
                     {/* Success Card */}
                     <div className="bg-gray-800 rounded-xl shadow-2xl overflow-hidden mb-8 print:shadow-none">
                         {/* Header */}
-                        <div className="bg-green-600 p-6 flex flex-col items-center justify-center">
-                            <CheckCircle className="w-16 h-16 text-white mb-4" />
-                            <h1 className="text-2xl sm:text-3xl font-bold text-white mb-2">Order Received!</h1>
-                            <p className="text-green-100 text-center">
-                                Your order has been received and will be processed by our staff shortly.
-                            </p>
+                        <div className={`${
+                            transaction.payment_status === 'pending' && transaction.payment_method === 'midtrans' 
+                                ? 'bg-yellow-600' : 'bg-green-600'
+                        } p-6 flex flex-col items-center justify-center`}>
+                            {transaction.payment_status === 'pending' && transaction.payment_method === 'midtrans' ? (
+                                <>
+                                    <ShoppingBag className="w-16 h-16 text-white mb-4" />
+                                    <h1 className="text-2xl sm:text-3xl font-bold text-white mb-2">Payment Pending</h1>
+                                    <p className="text-yellow-100 text-center">
+                                        Your order has been created but payment is still pending. Please complete the payment to process your order.
+                                    </p>
+                                </>
+                            ) : (
+                                <>
+                                    <CheckCircle className="w-16 h-16 text-white mb-4" />
+                                    <h1 className="text-2xl sm:text-3xl font-bold text-white mb-2">Order Received!</h1>
+                                    <p className="text-green-100 text-center">
+                                        Your order has been received and will be processed by our staff shortly.
+                                    </p>
+                                </>
+                            )}
                         </div>
 
                         {/* Order Details */}
@@ -41,7 +56,7 @@ const ThankYou = ({ transaction }) => {
                                 <div className="grid grid-cols-2 gap-4">
                                     <div>
                                         <p className="text-gray-400 text-sm">Order Number</p>
-                                        <p className="text-white font-medium">{transaction.id}</p>
+                                        <p className="text-white font-medium">{transaction.kode_transaksi}</p>
                                     </div>
                                     <div>
                                         <p className="text-gray-400 text-sm">Date</p>
@@ -51,7 +66,23 @@ const ThankYou = ({ transaction }) => {
                                     </div>
                                     <div>
                                         <p className="text-gray-400 text-sm">Payment Method</p>
-                                        <p className="text-white font-medium">Cash</p>
+                                        <p className="text-white font-medium">
+                                            {transaction.payment_method === 'midtrans' ? 'Online Payment' : 'Cash'}
+                                        </p>
+                                    </div>
+                                    <div>
+                                        <p className="text-gray-400 text-sm">Payment Status</p>
+                                        <p className={`font-medium ${
+                                            transaction.payment_status === 'paid' || 
+                                            transaction.payment_status === 'settlement' || 
+                                            transaction.payment_status === 'capture' ? 'text-green-400' : 
+                                            transaction.payment_status === 'pending' ? 'text-yellow-400' : 'text-red-400'
+                                        }`}>
+                                            {transaction.payment_status === 'paid' || 
+                                             transaction.payment_status === 'settlement' || 
+                                             transaction.payment_status === 'capture' ? 'Paid' :
+                                             transaction.payment_status === 'pending' ? 'Pending' : 'Failed'}
+                                        </p>
                                     </div>
                                     <div>
                                         <p className="text-gray-400 text-sm">Total Amount</p>
@@ -138,6 +169,18 @@ const ThankYou = ({ transaction }) => {
 
                     {/* Action Buttons */}
                     <div className="flex flex-col sm:flex-row justify-center space-y-3 sm:space-y-0 sm:space-x-4 print:hidden">
+                        {/* Show payment button if payment is pending */}
+                        {transaction.payment_status === 'pending' && transaction.payment_method === 'midtrans' && transaction.midtrans_payment_url && (
+                            <a 
+                                href={transaction.midtrans_payment_url} 
+                                target="_blank"
+                                className="px-6 py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-all flex items-center justify-center"
+                            >
+                                <CreditCard className="mr-2 w-5 h-5" />
+                                <span>Complete Payment</span>
+                            </a>
+                        )}
+                        
                         <button
                             onClick={handlePrint}
                             className="px-6 py-3 bg-gray-700 text-white rounded-lg font-medium hover:bg-gray-600 transition-all flex items-center justify-center"
@@ -145,6 +188,7 @@ const ThankYou = ({ transaction }) => {
                             <Printer className="mr-2 w-5 h-5" />
                             <span>Print Receipt</span>
                         </button>
+                        
                         <button
                             onClick={goHome}
                             className="px-6 py-3 bg-orange-500 text-white rounded-lg font-medium hover:bg-orange-600 transition-all flex items-center justify-center"

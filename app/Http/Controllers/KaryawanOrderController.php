@@ -15,6 +15,13 @@ class KaryawanOrderController extends Controller
 
         return Inertia::render('Karyawan/Orders', [
             'pendingOrders' => Transaction::where('status', 'waiting')
+                ->where(function($query) {
+                    $query->where('payment_method', 'cash')
+                          ->orWhere(function($q) {
+                              $q->where('payment_method', 'midtrans')
+                                ->whereIn('payment_status', ['paid', 'settlement', 'capture']);
+                          });
+                })
                 ->orderBy('queue_number', 'asc') // Changed to ascending for FIFO order
                 ->get()
                 ->map(function($transaction) {

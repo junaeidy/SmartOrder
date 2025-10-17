@@ -18,6 +18,13 @@ class Transaction extends Model
         'total_amount',
         'total_items',
         'payment_method',
+        'payment_status',
+        'midtrans_transaction_id',
+        'midtrans_transaction_status',
+        'midtrans_payment_type',
+        'midtrans_payment_url',
+        'paid_at',
+        'confirmation_email_sent_at',
         'queue_number',
         'status',
         'items',
@@ -25,5 +32,7 @@ class Transaction extends Model
 
     protected $casts = [
         'items' => 'array',
+        'paid_at' => 'datetime',
+        'confirmation_email_sent_at' => 'datetime',
     ];
 }
