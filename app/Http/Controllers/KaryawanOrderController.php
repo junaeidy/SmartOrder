@@ -67,6 +67,9 @@ class KaryawanOrderController extends Controller
         $transaction->status = $request->status;
         $transaction->save();
 
+        // Broadcast status change for realtime dashboards
+        event(new \App\Events\OrderStatusChanged($transaction));
+
         return back()->with('success', 'Order has been processed successfully');
     }
 }

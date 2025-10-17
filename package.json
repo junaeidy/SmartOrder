@@ -24,6 +24,7 @@
         "laravel-echo": "^2.2.4",
         "lucide-react": "^0.545.0",
         "pusher-js": "^8.4.0",
-        "react-hot-toast": "^2.6.0"
+        "react-hot-toast": "^2.6.0",
+        "recharts": "^3.3.0"
     }
 }
