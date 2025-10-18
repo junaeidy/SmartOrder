@@ -4,7 +4,49 @@ import { Head, router } from '@inertiajs/react';
 import Modal from '@/Components/Modal';
 import { Eye, CheckCircle, XCircle, Clock as ClockIcon } from 'lucide-react';
 
-const currencyIDR = (n) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(n || 0);
+  // Robust date parser for Laravel-style timestamps ("YYYY-MM-DD HH:mm:ss")
+  const parseLaravelDate = (value) => {
+    if (!value) return null;
+    if (value instanceof Date && !isNaN(value)) return value;
+    try {
+      if (typeof value === 'string') {
+        const s = value.trim();
+        // If it's a space-separated format: YYYY-MM-DD HH:mm:ss
+        if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}/.test(s)) {
+          const [datePart, timePart] = s.split(' ');
+          const [y, mo, d] = datePart.split('-').map(Number);
+          const [h, mi, se] = timePart.split(':').map(Number);
+          const dt = new Date(y, (mo || 1) - 1, d || 1, h || 0, mi || 0, se || 0);
+          return isNaN(dt) ? null : dt;
+        }
+        // Otherwise, let Date try (handles ISO like 2025-10-18T13:21:50Z)
+        const dt = new Date(s);
+        return isNaN(dt) ? null : dt;
+      }
+    } catch (_) { /* ignore */ }
+    return null;
+  };
+
+  // Choose the best timestamp to display: paid_at > updated_at > created_at > date
+  const resolveTransactionDate = (t) => {
+    return (
+      parseLaravelDate(t?.paid_at) ||
+      parseLaravelDate(t?.updated_at) ||
+      parseLaravelDate(t?.created_at) ||
+      parseLaravelDate(t?.date)
+    );
+  };
+
+  const currencyIDR = (n) => {
+    // Pastikan n adalah number, jika string ubah ke number
+    const amount = typeof n === 'string' ? parseFloat(n) : n;
+    return new Intl.NumberFormat('id-ID', { 
+      style: 'currency', 
+      currency: 'IDR', 
+      minimumFractionDigits: 0 
+    }).format(amount || 0);
+  };
+
 const PaymentBadge = ({ status }) => {
   const s = (status || '').toLowerCase();
   let cls = 'bg-gray-200 text-gray-800';
@@ -17,6 +59,19 @@ const PaymentBadge = ({ status }) => {
 
 export default function Transaksi({ auth, transactions }) {
   const rows = transactions?.data || [];
+  console.log('Received transactions:', rows);
+
+  // Debug first transaction if exists
+  if (rows.length > 0) {
+    console.log('First transaction details:', {
+      created_at: rows[0].created_at,
+      date: rows[0].date,
+      items: rows[0].items,
+      total_amount: rows[0].total_amount,
+      raw: rows[0]
+    });
+  }
+
   const [currentTime, setCurrentTime] = useState(new Date());
   const [selected, setSelected] = useState(null);
   const [showDetail, setShowDetail] = useState(false);
@@ -25,7 +80,173 @@ export default function Transaksi({ auth, transactions }) {
   const [showActionModal, setShowActionModal] = useState(false);
   const [actionType, setActionType] = useState(null);
   const [actionTarget, setActionTarget] = useState(null);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [processedOrder, setProcessedOrder] = useState(null);
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [printerConnected, setPrinterConnected] = useState(false);
+  const [printerDevice, setPrinterDevice] = useState(null);
   const debounceRef = useRef(null);
+
+  // Fungsi untuk print struk
+  const connectPrinter = async () => {
+    try {
+      const device = await navigator.bluetooth.requestDevice({
+        acceptAllDevices: true,
+        optionalServices: ['000018f0-0000-1000-8000-00805f9b34fb', 'e7810a71-73ae-499d-8c15-faa9aef0c3f2']
+      });
+      
+      console.log('Connecting to printer:', device.name);
+      await device.gatt.connect();
+      setPrinterDevice(device);
+      setPrinterConnected(true);
+      return true;
+    } catch (error) {
+      console.error('Error connecting to printer:', error);
+      setPrinterConnected(false);
+      setPrinterDevice(null);
+      alert('Gagal terhubung ke printer. Pastikan printer Bluetooth sudah dinyalakan dan dalam jangkauan.');
+      return false;
+    }
+  };
+
+      const writeToCharacteristic = async (characteristic, data) => {
+        const maxChunkSize = 512;
+        for (let i = 0; i < data.length; i += maxChunkSize) {
+          const chunk = data.slice(i, Math.min(i + maxChunkSize, data.length));
+          await characteristic.writeValue(chunk);
+          // Tambah delay kecil antara chunks untuk memastikan printer bisa mengikuti
+          await new Promise(resolve => setTimeout(resolve, 50));
+        }
+      };
+
+      const printReceipt = async (order) => {
+    try {
+      console.log('Starting print process...');
+      // Gunakan printer yang sudah terhubung atau hubungkan yang baru
+      const device = printerDevice || await navigator.bluetooth.requestDevice({
+        filters: [
+          { services: ['000018f0-0000-1000-8000-00805f9b34fb'] },
+          { namePrefix: 'Printer' }
+        ]
+      });
+
+      console.log('Connecting to printer:', device.name);
+      const server = await device.gatt.connect();
+      const service = await server.getPrimaryService('000018f0-0000-1000-8000-00805f9b34fb');
+      const characteristic = await service.getCharacteristic('00002af1-0000-1000-8000-00805f9b34fb');
+
+      console.log('Preparing receipt data...');
+      // Format struk
+      const formatDateTime = (dateObj) => {
+        if (!dateObj || isNaN(dateObj)) return { date: '-', time: '-' };
+        try {
+          const dateFormatter = new Intl.DateTimeFormat('id-ID', {
+            day: '2-digit',
+            month: '2-digit',
+            year: 'numeric'
+          });
+          const timeFormatter = new Intl.DateTimeFormat('id-ID', {
+            hour: '2-digit',
+            minute: '2-digit',
+            hour12: false
+          });
+          return {
+            date: dateFormatter.format(dateObj),
+            time: timeFormatter.format(dateObj)
+          };
+        } catch (error) {
+          console.error('Error formatting date:', error);
+          return { date: '-', time: '-' };
+        }
+      };
+
+      // Use paid_at > updated_at > created_at
+      const resolvedDate = resolveTransactionDate(order);
+      const datetime = formatDateTime(resolvedDate);
+      
+      const ESC = '\x1B';
+      const GS = '\x1D';
+      const INIT = ESC + '@'; // Initialize printer
+      const CENTER = ESC + 'a' + '\x01'; // Center alignment
+      const LEFT = ESC + 'a' + '\x00';  // Left alignment
+      const BOLD_ON = ESC + 'E' + '\x01'; // Bold on
+      const BOLD_OFF = ESC + 'E' + '\x00'; // Bold off
+      const DOUBLE_ON = GS + '!' + '\x11'; // Double height & width
+      const DOUBLE_OFF = GS + '!' + '\x00'; // Normal size
+      const LARGE_ON = GS + '!' + '\x01'; // Large text
+      const LARGE_OFF = GS + '!' + '\x00'; // Normal text
+
+      const receipt = [
+        INIT,
+        CENTER,
+        DOUBLE_ON + 'SMART ORDER\n' + DOUBLE_OFF,
+        'Jl. Pegangsaan Timur No.123\n',
+        'Telp: 0812-3456-7890\n',
+        '\n',
+        BOLD_ON + '========================\n' + BOLD_OFF,
+        LEFT,
+        `No. Antrian : #${order.queue_number}\n`,
+        `Tanggal     : ${datetime.date}\n`,
+        `Jam         : ${datetime.time}\n`,
+        `Kasir       : ${auth.user.name}\n`,
+        `Pelanggan   : ${order.customer_name}\n`,
+        BOLD_ON + '------------------------\n' + BOLD_OFF,
+      ];
+
+      // Fungsi untuk format harga
+      const formatPrice = (price) => {
+        const num = typeof price === 'string' ? parseFloat(price) : Number(price);
+        if (!isFinite(num)) return '0';
+        return Math.round(num).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+      };
+
+      // Tambahkan items
+      order.items.forEach(item => {
+        const rawPrice = (item.harga ?? item.price);
+        const priceNum = typeof rawPrice === 'string' ? parseFloat(rawPrice) : Number(rawPrice);
+        const qtyNum = Number(item.quantity ?? item.qty ?? 0);
+        const subtotal = (item.subtotal != null) ? Number(item.subtotal) : (qtyNum * (isFinite(priceNum) ? priceNum : 0));
+        // Format item dengan padding untuk alignment
+        const itemName = item.nama.length > 20 ? item.nama.substring(0, 17) + '...' : item.nama;
+        const qtyStr = `${qtyNum}x`;
+        const priceStr = formatPrice(priceNum);
+        const subtotalStr = formatPrice(subtotal);
+        
+        receipt.push(
+          `${itemName}\n`,
+          `${qtyStr.padEnd(4)}${priceStr.padStart(10)} = ${subtotalStr.padStart(10)}\n`
+        );
+      });
+
+      receipt.push(
+        BOLD_ON + '------------------------\n' + BOLD_OFF,
+  `Total     : Rp ${formatPrice(order.total_amount)}\n`,
+        `Pembayaran: ${order.payment_method.toUpperCase()}\n`,
+        '\n',
+        CENTER,
+        'Terima Kasih\n',
+        'Atas Kunjungan Anda\n\n',
+        'Semoga Anda Puas\n',
+        'Dengan Pelayanan Kami\n',
+        '\n\n\n' // Extra lines for paper cutting
+      );
+
+      // Kirim ke printer dalam chunks
+      console.log('Encoding receipt data...');
+      const encoder = new TextEncoder();
+      const fullData = encoder.encode(receipt.join(''));
+      console.log('Data size:', fullData.length, 'bytes');
+      
+      // Kirim data dalam chunks
+      console.log('Sending data to printer in chunks...');
+      await writeToCharacteristic(characteristic, fullData);
+      
+      console.log('Print successful');
+    } catch (error) {
+      console.error('Error printing:', error);
+      alert('Gagal mencetak struk. Pastikan printer Bluetooth sudah dinyalakan dan terhubung.');
+    }
+  };
   const [audioPermissionGranted, setAudioPermissionGranted] = useState(false);
   
   // Function to request audio permission
@@ -66,27 +287,37 @@ export default function Transaksi({ auth, transactions }) {
     }
   };
 
-  const openDetail = (t) => { setSelected(t); setShowDetail(true); };
+  const openDetail = (t) => { 
+    console.log('Opening detail for transaction:', t);
+    setSelected(t); 
+    setShowDetail(true); 
+  };
   const closeDetail = () => { setSelected(null); setShowDetail(false); };
 
   const confirmOrder = (t) => {
     if (!t) return;
     setActionTarget(t);
     setActionType('confirm');
-    setShowActionModal(true);
+    setShowConfirmModal(true);
   };
   const cancelOrder = (t) => {
     if (!t) return;
     setActionTarget(t);
     setActionType('cancel');
-    setShowActionModal(true);
+    setShowConfirmModal(true);
   };
   const performAction = () => {
     if (!actionTarget || !actionType) return;
     setBusyId(actionTarget.id);
     const url = actionType === 'confirm' ? route('kasir.transaksi.confirm', actionTarget.id) : route('kasir.transaksi.cancel', actionTarget.id);
-    putWithRetry(url);
-    setShowActionModal(false);
+    
+    putWithRetry(url, {}, 1, 3, () => {
+      setShowActionModal(false);
+      if (actionType === 'confirm') {
+        setProcessedOrder(actionTarget);
+        setShowSuccessModal(true);
+      }
+    });
   };
 
   // Generic retry helpers
@@ -99,12 +330,15 @@ export default function Transaksi({ auth, transactions }) {
       }
     });
   };
-  const putWithRetry = (url, data = {}, attempt = 1, max = 3) => {
+  const putWithRetry = (url, data = {}, attempt = 1, max = 3, onSuccess = null) => {
     router.put(url, data, {
       preserveScroll: true,
+      onSuccess: () => {
+        if (onSuccess) onSuccess();
+      },
       onError: () => {
         if (attempt < max) {
-          setTimeout(() => putWithRetry(url, data, attempt + 1, max), attempt * 800);
+          setTimeout(() => putWithRetry(url, data, attempt + 1, max, onSuccess), attempt * 800);
         }
       },
       onFinish: () => setBusyId(null)
@@ -232,7 +466,22 @@ export default function Transaksi({ auth, transactions }) {
       user={auth?.user}
       header={
         <div className="flex flex-col md:flex-row justify-between items-center">
-          <h2 className="text-xl font-semibold leading-tight text-gray-800 dark:text-gray-200">Konfirmasi Transaksi</h2>
+          <div className="flex flex-col space-y-2 md:space-y-0 md:flex-row md:items-center md:space-x-4">
+            <h2 className="text-xl font-semibold leading-tight text-gray-800 dark:text-gray-200">Konfirmasi Transaksi</h2>
+            <button
+              onClick={connectPrinter}
+              className={`inline-flex items-center px-3 py-1.5 rounded text-sm font-medium transition-colors ${
+                printerConnected 
+                  ? 'bg-green-100 text-green-800 dark:bg-green-800/30 dark:text-green-400' 
+                  : 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
+              }`}
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className={`h-4 w-4 mr-1.5 ${printerConnected ? 'text-green-600 dark:text-green-400' : 'text-gray-600 dark:text-gray-400'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+              </svg>
+              {printerConnected ? 'Printer Terhubung' : 'Hubungkan Printer'}
+            </button>
+          </div>
           <div className="flex items-center space-x-2 text-sm md:text-base">
             <ClockIcon className="h-5 w-5 text-orange-500 animate-pulse" />
             <div className="flex flex-col md:flex-row md:space-x-2">
@@ -276,13 +525,24 @@ export default function Transaksi({ auth, transactions }) {
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {rows.map((t) => (
-              <div key={t.id} className="bg-gray-800 rounded-lg shadow-md overflow-hidden border-l-4 border-orange-500 transition-all hover:shadow-lg">
+              <div key={t.id} className="bg-gray-800 rounded-lg shadow-md overflow-hidden border-l-4 border-orange-500 transition-all hover:shadow-lg cursor-pointer" onClick={() => openDetail(t)}>
                 <div className="p-5">
                   <div className="flex justify-between items-center mb-3">
-                    <div className="flex items-center">
+                      <div className="flex items-center">
                       <span className="bg-orange-500/20 text-orange-400 px-3 py-1.5 rounded text-base font-bold">#{t.queue_number}</span>
                       <div className="flex items-center ml-2 bg-blue-900/30 px-2 py-1 rounded">
-                        <span className="text-xs text-blue-300">{t.date || '-'}</span>
+                        <span className="text-xs text-blue-300">
+                          {(() => {
+                            const d = resolveTransactionDate(t);
+                            return d ? d.toLocaleString('id-ID', {
+                              day: '2-digit',
+                              month: '2-digit',
+                              year: 'numeric',
+                              hour: '2-digit',
+                              minute: '2-digit'
+                            }) : '-';
+                          })()}
+                        </span>
                       </div>
                     </div>
                     <div className="flex items-center space-x-2">
@@ -303,17 +563,7 @@ export default function Transaksi({ auth, transactions }) {
                     </div>
                   </div>
                   <div className="flex items-center justify-end space-x-2">
-                    <button onClick={() => openDetail(t)} className="inline-flex items-center px-3 py-1.5 rounded-md bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-800 dark:text-gray-100 text-xs font-medium">
-                      <Eye className="w-4 h-4 mr-1" /> Lihat
-                    </button>
-                    <button disabled={busyId===t.id} onClick={() => { setBusyId(t.id); putWithRetry(route('kasir.transaksi.confirm', t.id)); }} className="inline-flex items-center px-3 py-1.5 rounded-md bg-green-600 hover:bg-green-700 text-white text-xs font-medium disabled:opacity-60">
-                      <CheckCircle className="w-4 h-4 mr-1" /> Konfirmasi
-                    </button>
-                    {t.payment_method==='cash' && (
-                      <button disabled={busyId===t.id} onClick={() => { setBusyId(t.id); putWithRetry(route('kasir.transaksi.cancel', t.id)); }} className="inline-flex items-center px-3 py-1.5 rounded-md bg-red-600 hover:bg-red-700 text-white text-xs font-medium disabled:opacity-60">
-                        <XCircle className="w-4 h-4 mr-1" /> Batalkan
-                      </button>
-                    )}
+                    
                   </div>
                 </div>
               </div>
@@ -339,7 +589,18 @@ export default function Transaksi({ auth, transactions }) {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="text-sm">
                     <div className="text-gray-500 dark:text-gray-400">Tanggal</div>
-                    <div className="font-medium">{selected.date || '-'}</div>
+                    <div className="font-medium">
+                      {(() => {
+                        const d = resolveTransactionDate(selected);
+                        return d ? d.toLocaleString('id-ID', {
+                          day: '2-digit',
+                          month: '2-digit',
+                          year: 'numeric',
+                          hour: '2-digit',
+                          minute: '2-digit'
+                        }) : '-';
+                      })()}
+                    </div>
                   </div>
                   <div className="text-sm">
                     <div className="text-gray-500 dark:text-gray-400">Customer</div>
@@ -379,9 +640,11 @@ export default function Transaksi({ auth, transactions }) {
                           {(selected.items || []).length > 0 ? (
                             selected.items.map((it, idx) => {
                               const name = it.nama || it.name || `Item ${idx+1}`;
-                              const qty = Number(it.quantity || it.qty || 0);
-                              const price = Number(it.price || it.harga || 0);
-                              const subtotal = Number(it.subtotal != null ? it.subtotal : (qty * price));
+                              const qty = parseInt(it.quantity || it.qty || 0, 10);
+                              // Convert string price to number
+                              const price = parseFloat(String(it.harga || it.price).replace(/[^\d.-]/g, ''));
+                              // Use provided subtotal or calculate
+                              const subtotal = it.subtotal ? parseFloat(String(it.subtotal)) : (qty * price);
                               return (
                                 <tr key={idx}>
                                   <td className="px-3 py-2 text-sm">{name}</td>
@@ -426,6 +689,146 @@ export default function Transaksi({ auth, transactions }) {
           </div>
         </Modal>
       </div>
+      {/* Confirmation Modal */}
+      <Modal show={showConfirmModal} onClose={() => setShowConfirmModal(false)} maxWidth="md">
+        <div className="p-6">
+          <div className="flex items-center mb-4">
+            <div className={`mx-auto flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full ${
+              actionType === 'confirm' ? 'bg-blue-100' : 'bg-red-100'
+            }`}>
+              {actionType === 'confirm' ? (
+                <CheckCircle className="h-8 w-8 text-blue-600" />
+              ) : (
+                <XCircle className="h-8 w-8 text-red-600" />
+              )}
+            </div>
+          </div>
+          
+          <div className="mt-3 text-center">
+            <h3 className="text-lg font-medium leading-6 text-gray-900 dark:text-gray-100">
+              {actionType === 'confirm' ? 'Konfirmasi Pesanan' : 'Batalkan Pesanan'}
+            </h3>
+            <div className="mt-2">
+              <p className="text-sm text-gray-500 dark:text-gray-400">
+                {actionType === 'confirm'
+                  ? `Apakah Anda yakin ingin mengkonfirmasi pesanan #${actionTarget?.queue_number}?`
+                  : `Apakah Anda yakin ingin membatalkan pesanan #${actionTarget?.queue_number}?`
+                }
+              </p>
+            </div>
+            
+            {actionTarget && (
+              <div className="mt-4 bg-gray-50 dark:bg-gray-800 rounded-lg p-4 text-left">
+                <div className="space-y-2">
+                  <div className="flex justify-between">
+                    <span className="text-gray-600 dark:text-gray-400">Pelanggan:</span>
+                    <span className="font-medium">{actionTarget.customer_name}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600 dark:text-gray-400">Total Items:</span>
+                    <span className="font-medium">{actionTarget.total_items}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600 dark:text-gray-400">Total:</span>
+                    <span className="font-medium">{currencyIDR(actionTarget.total_amount)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600 dark:text-gray-400">Pembayaran:</span>
+                    <span className="font-medium capitalize">{actionTarget.payment_method}</span>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+          
+          <div className="mt-6 flex flex-col sm:flex-row gap-3 justify-center">
+            <button
+              onClick={() => {
+                setShowConfirmModal(false);
+                performAction();
+              }}
+              disabled={busyId === actionTarget?.id}
+              className={`inline-flex justify-center items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white ${
+                actionType === 'confirm'
+                  ? 'bg-blue-600 hover:bg-blue-700'
+                  : 'bg-red-600 hover:bg-red-700'
+              } focus:outline-none focus:ring-2 focus:ring-offset-2 ${
+                actionType === 'confirm' ? 'focus:ring-blue-500' : 'focus:ring-red-500'
+              } ${busyId === actionTarget?.id ? 'opacity-50 cursor-not-allowed' : ''}`}
+            >
+              {actionType === 'confirm' ? 'Ya, Konfirmasi' : 'Ya, Batalkan'}
+            </button>
+            <button
+              onClick={() => setShowConfirmModal(false)}
+              className="inline-flex justify-center items-center px-4 py-2 border border-gray-300 dark:border-gray-600 text-sm font-medium rounded-md text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+            >
+              Batal
+            </button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Success Modal */}
+      <Modal show={showSuccessModal} onClose={() => setShowSuccessModal(false)} maxWidth="md">
+        <div className="p-6">
+          <div className="flex items-center justify-center mb-4">
+            <div className="mx-auto flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-green-100">
+              <CheckCircle className="h-8 w-8 text-green-600" />
+            </div>
+          </div>
+          <div className="mt-3 text-center sm:mt-5">
+            <h3 className="text-lg font-semibold leading-6 text-gray-900 dark:text-gray-100">
+              Pesanan Berhasil Diselesaikan
+            </h3>
+            <div className="mt-2">
+              <p className="text-sm text-gray-500 dark:text-gray-400">
+                Pesanan #{processedOrder?.queue_number} telah berhasil dikonfirmasi.
+              </p>
+            </div>
+            
+            {/* Order Summary */}
+            <div className="mt-4 bg-gray-50 dark:bg-gray-800 rounded-lg p-4 text-left">
+              <div className="space-y-2">
+                <div className="flex justify-between">
+                  <span className="text-gray-600 dark:text-gray-400">Pelanggan:</span>
+                  <span className="font-medium">{processedOrder?.customer_name}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600 dark:text-gray-400">Total Items:</span>
+                  <span className="font-medium">{processedOrder?.total_items}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600 dark:text-gray-400">Total:</span>
+                  <span className="font-medium text-green-600">{currencyIDR(processedOrder?.total_amount)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600 dark:text-gray-400">Pembayaran:</span>
+                  <span className="font-medium capitalize">{processedOrder?.payment_method}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <div className="mt-6 flex flex-col sm:flex-row gap-3 justify-center">
+            <button
+              onClick={() => printReceipt(processedOrder)}
+              className="inline-flex justify-center items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+              </svg>
+              Cetak Struk
+            </button>
+            <button
+              onClick={() => setShowSuccessModal(false)}
+              className="inline-flex justify-center items-center px-4 py-2 border border-gray-300 dark:border-gray-600 text-sm font-medium rounded-md text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+            >
+              OK
+            </button>
+          </div>
+        </div>
+      </Modal>
+
       {/* Audio element kept as fallback/preload (we primarily use new Audio()) */}
       <audio ref={audioRef} preload="auto">
         <source src="/sounds/notification.wav" type="audio/wav" />
