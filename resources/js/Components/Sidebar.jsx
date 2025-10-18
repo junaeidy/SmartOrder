@@ -15,16 +15,14 @@ export default function Sidebar() {
   };
 
   const menus = {
-    owner: [
-      { label: "Dashboard", icon: <Home size={18} />, href: "/owner/dashboard" },
-      { label: "Data Karyawan", icon: <Users size={18} />, href: "/owner/karyawan" },
-      { label: "Laporan", icon: <ClipboardList size={18} />, href: "/owner/laporan" },
-      { label: "Pengaturan", icon: <Settings size={18} />, href: "/owner/settings" },
+    admin: [
+      { label: "Dashboard", icon: <Home size={18} />, href: route('admin.dashboard') },
+      { label: "Laporan", icon: <ClipboardList size={18} />, href: route('admin.reports') },
+      { label: "Pengaturan", icon: <Settings size={18} />, href: "/admin/settings" },
     ],
     kasir: [
-      { label: "Dashboard", icon: <Home size={18} />, href: "/kasir/dashboard" },
+      { label: "Dashboard", icon: <Home size={18} />, href: route("kasir.dashboard") },
       { label: "Transaksi", icon: <ShoppingCart size={18} />, href: route("kasir.transaksi") },
-      { label: "Riwayat", icon: <ClipboardList size={18} />, href: "/kasir/riwayat" },
       { label: "Laporan", icon: <Grid2X2PlusIcon size={18} />, href: route("kasir.reports") },
       { label: "Produk", icon: <Donut size={18} />, href: route("products.index") },
     ],

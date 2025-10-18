@@ -47,8 +47,12 @@ Route::get('/admin/reset-queue', function() {
 
 Route::middleware(['auth', 'verified'])->group(function () {
 
-    Route::middleware(['role:owner'])->group(function () {
-        Route::get('/owner/dashboard', [DashboardController::class, 'owner'])->name('owner.dashboard');
+    Route::middleware(['role:admin'])->group(function () {
+        Route::get('/admin/dashboard', [DashboardController::class, 'admin'])->name('admin.dashboard');
+        // Reports (duplicated from kasir)
+        Route::get('/admin/reports', [App\Http\Controllers\ReportsController::class, 'adminIndex'])->name('admin.reports');
+        Route::get('/admin/reports/export/excel', [App\Http\Controllers\ReportsController::class, 'adminExportExcel'])->name('admin.reports.export.excel');
+        Route::get('/admin/reports/export/pdf', [App\Http\Controllers\ReportsController::class, 'adminExportPdf'])->name('admin.reports.export.pdf');
     });
 
     Route::middleware(['role:kasir'])->group(function () {

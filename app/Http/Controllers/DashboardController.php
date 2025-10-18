@@ -7,12 +7,7 @@ use Inertia\Inertia;
 
 class DashboardController extends Controller
 {
-    public function owner()
-    {
-        return Inertia::render('Owner/Dashboard');
-    }
-
-    public function kasir()
+    public function admin()
     {
         $startOfToday = now()->startOfDay();
         $endOfToday = now()->endOfDay();
@@ -211,9 +206,74 @@ class DashboardController extends Controller
             'avgCompletionByDay' => $avgCompletionByDay,
         ];
 
-        return Inertia::render('Kasir/Dashboard', [
+        return Inertia::render('Admin/Dashboard', [
             'stats' => $stats,
             'charts' => $charts,
+        ]);
+    }
+
+    public function kasir()
+    {
+        $startOfToday = now()->startOfDay();
+        $endOfToday = now()->endOfDay();
+        $paidStatuses = ['paid', 'settlement', 'capture'];
+
+        // Fetch today's relevant transactions (waiting or completed)
+        $todayTx = \App\Models\Transaction::whereBetween('created_at', [$startOfToday, $endOfToday])
+            ->whereIn('status', ['waiting', 'completed', 'canceled'])
+            ->get();
+
+        // Basic stats relevant for kasir role
+        $todayOrders = $todayTx->count();
+        $pendingCount = \App\Models\Transaction::where('status', 'waiting')->count();
+        $completedToday = \App\Models\Transaction::where('status', 'completed')
+            ->whereBetween('created_at', [$startOfToday, $endOfToday])
+            ->count();
+
+        // Top products today - relevant for inventory management
+        $productAgg = [];
+        foreach ($todayTx as $tx) {
+            $items = is_array($tx->items) ? $tx->items : [];
+            foreach ($items as $item) {
+                $name = $item['nama'] ?? 'Item';
+                $qty = (int) ($item['quantity'] ?? 0);
+                if (!isset($productAgg[$name])) {
+                    $productAgg[$name] = ['name' => $name, 'quantity' => 0];
+                }
+                $productAgg[$name]['quantity'] += $qty;
+            }
+        }
+        // Take top 5 by quantity
+        $topProducts = collect($productAgg)->sortByDesc('quantity')->take(5)->values()->all();
+
+        // Recent transactions - for quick lookup
+        $recentTransactions = \App\Models\Transaction::orderBy('created_at', 'desc')
+            ->take(10)
+            ->get()
+            ->map(function($tx) use ($paidStatuses) {
+                return [
+                    'id' => $tx->id,
+                    'kode_transaksi' => $tx->kode_transaksi,
+                    'customer_name' => $tx->customer_name,
+                    'created_at' => $tx->created_at ? $tx->created_at->diffForHumans() : null,
+                    'status' => $tx->status,
+                    'payment_method' => $tx->payment_method === 'midtrans' ? 'online' : $tx->payment_method,
+                    'payment_status' => $tx->payment_status,
+                    'total_amount' => $tx->total_amount,
+                    'is_paid' => in_array(strtolower((string)$tx->payment_status), $paidStatuses),
+                ];
+            });
+
+        $stats = [
+            'todayOrders' => $todayOrders,
+            'pendingCount' => $pendingCount,
+            'completedToday' => $completedToday,
+        ];
+
+        return Inertia::render('Kasir/Dashboard', [
+            'stats' => $stats,
+            'topProducts' => $topProducts,
+            'recentTransactions' => $recentTransactions,
         ]);
     }
 
