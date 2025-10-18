@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Product;
 use App\Models\Transaction;
+use App\Models\Setting;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Carbon\Carbon;
@@ -33,6 +34,8 @@ class KasirTransactionController extends Controller
                 'payment_status' => $t->payment_status,
                 'status' => $t->status,
                 'total_amount' => $t->total_amount,
+                'discount_amount' => $t->discount_amount,
+                'tax_amount' => $t->tax_amount,
                 'total_items' => $t->total_items,
                 'items' => is_array($t->items) ? $t->items : [],
                 'amount_received' => $t->amount_received,
@@ -65,6 +68,8 @@ class KasirTransactionController extends Controller
                 'payment_status' => $t->payment_status,
                 'status' => $t->status,
                 'total_amount' => $t->total_amount,
+                'discount_amount' => $t->discount_amount,
+                'tax_amount' => $t->tax_amount,
                 'total_items' => $t->total_items,
                 'items' => is_array($t->items) ? $t->items : [],
                 'amount_received' => $t->amount_received,
@@ -76,6 +81,12 @@ class KasirTransactionController extends Controller
         return Inertia::render('Kasir/Transaksi', [
             'transactions' => $transactions,
             'history' => $history,
+            'storeSettings' => [
+                'store_name' => Setting::get('store_name', 'SmartOrder'),
+                'store_address' => Setting::get('store_address', ''),
+                'store_phone' => Setting::get('store_phone', ''),
+                'store_email' => Setting::get('store_email', ''),
+            ],
         ]);
     }
 

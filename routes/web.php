@@ -10,6 +10,7 @@ use App\Http\Controllers\CheckoutController;
 use App\Models\QueueCounter;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\Broadcast;
 
 Route::get('/', [App\Http\Controllers\ProductController::class, 'index'])
     ->middleware('guest')
@@ -20,6 +21,9 @@ Route::get('/checkout', [CheckoutController::class, 'checkout'])
     
 Route::post('/checkout/process', [CheckoutController::class, 'process'])
     ->name('checkout.process');
+// Validate cart availability
+Route::post('/cart/validate', [CheckoutController::class, 'validateCart'])
+    ->name('cart.validate');
     
 Route::get('/thankyou/{transaction}', [CheckoutController::class, 'thankyou'])
     ->name('checkout.thankyou');
@@ -33,6 +37,10 @@ Route::get('/midtrans/status/{orderId}', [App\Http\Controllers\MidtransControlle
     
 Route::get('/midtrans/finish', [App\Http\Controllers\MidtransController::class, 'finish'])
     ->name('midtrans.finish');
+    
+// Discount Code Verification
+Route::post('/discount/verify', [App\Http\Controllers\DiscountController::class, 'verifyCode'])
+    ->name('discount.verify');
 
 Route::prefix('api')->group(function () {
     Route::get('/payment/check-status/{orderId}', [App\Http\Controllers\MidtransController::class, 'checkStatus'])
@@ -53,11 +61,24 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/admin/reports', [App\Http\Controllers\ReportsController::class, 'adminIndex'])->name('admin.reports');
         Route::get('/admin/reports/export/excel', [App\Http\Controllers\ReportsController::class, 'adminExportExcel'])->name('admin.reports.export.excel');
         Route::get('/admin/reports/export/pdf', [App\Http\Controllers\ReportsController::class, 'adminExportPdf'])->name('admin.reports.export.pdf');
+        
+        // Settings
+        Route::get('/admin/settings', [App\Http\Controllers\Admin\SettingsController::class, 'index'])->name('admin.settings');
+        Route::post('/admin/settings/store-hours', [App\Http\Controllers\Admin\SettingsController::class, 'updateStoreHours'])->name('admin.settings.store-hours');
+        Route::post('/admin/settings/store-settings', [App\Http\Controllers\Admin\SettingsController::class, 'updateStoreSettings'])->name('admin.settings.store-settings');
+        
+        // Discounts
+        Route::post('/admin/discounts', [App\Http\Controllers\Admin\DiscountController::class, 'store'])->name('admin.discounts.store');
+        Route::put('/admin/discounts/{discount}', [App\Http\Controllers\Admin\DiscountController::class, 'update'])->name('admin.discounts.update');
+        Route::delete('/admin/discounts/{discount}', [App\Http\Controllers\Admin\DiscountController::class, 'destroy'])->name('admin.discounts.destroy');
+        Route::put('/admin/discounts/{discount}/toggle', [App\Http\Controllers\Admin\DiscountController::class, 'toggleActive'])->name('admin.discounts.toggle');
     });
 
     Route::middleware(['role:kasir'])->group(function () {
         Route::get('/kasir/dashboard', [DashboardController::class, 'kasir'])->name('kasir.dashboard');
         Route::resource('kasir/products', ProductController::class)->name('products.index', 'products.store', 'products.update', 'products.destroy');
+        Route::put('/kasir/products/{product}/toggle-closed', [ProductController::class, 'toggleClosed'])->name('products.toggleClosed');
+        Route::get('/kasir/stock/alerts', [ProductController::class, 'alerts'])->name('kasir.stock.alerts');
         // Reports
         Route::get('/kasir/reports', [App\Http\Controllers\ReportsController::class, 'index'])->name('kasir.reports');
         Route::get('/kasir/reports/export/excel', [App\Http\Controllers\ReportsController::class, 'exportExcel'])->name('kasir.reports.export.excel');
@@ -73,6 +94,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/karyawan/orders', [App\Http\Controllers\KaryawanOrderController::class, 'index'])->name('karyawan.orders');
         Route::put('/karyawan/orders/{transaction}', [App\Http\Controllers\KaryawanOrderController::class, 'processOrder'])->name('karyawan.orders.process');
     });
+});
+
+// Public broadcasting channel registration (if needed for authorization)
+Broadcast::channel('products', function ($user = null) {
+    return true;
 });
 
 Route::middleware('auth')->group(function () {

@@ -12,7 +12,7 @@ const PaymentStatusChecker = ({ transactionId, orderId, redirectAfterPayment = t
             try {
                 const response = await axios.get(`/midtrans/status/${orderId}`);
                 
-                console.log('Payment status response:', response.data);
+                
                 
                 if (response.data.success && 
                    (response.data.transaction.payment_status === 'paid' || 
@@ -26,7 +26,7 @@ const PaymentStatusChecker = ({ transactionId, orderId, redirectAfterPayment = t
                     
                     // If redirectAfterPayment is true, redirect to thank you page
                     if (redirectAfterPayment) {
-                        console.log('Payment successful, redirecting to thank you page');
+                        
                         router.visit(`/thankyou/${transactionId}`);
                     }
                     
@@ -42,7 +42,7 @@ const PaymentStatusChecker = ({ transactionId, orderId, redirectAfterPayment = t
                     setTimeout(checkPaymentStatus, 3000);
                 }
             } catch (error) {
-                console.error('Error checking payment status:', error);
+                
                 setStatus('error');
                 
                 if (checkCount < maxChecks) {

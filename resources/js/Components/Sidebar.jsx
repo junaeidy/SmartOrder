@@ -18,7 +18,7 @@ export default function Sidebar() {
     admin: [
       { label: "Dashboard", icon: <Home size={18} />, href: route('admin.dashboard') },
       { label: "Laporan", icon: <ClipboardList size={18} />, href: route('admin.reports') },
-      { label: "Pengaturan", icon: <Settings size={18} />, href: "/admin/settings" },
+      { label: "Pengaturan", icon: <Settings size={18} />, href: route('admin.settings') },
     ],
     kasir: [
       { label: "Dashboard", icon: <Home size={18} />, href: route("kasir.dashboard") },

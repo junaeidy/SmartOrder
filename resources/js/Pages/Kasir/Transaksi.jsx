@@ -79,7 +79,7 @@ const OrderStatusBadge = ({ status }) => {
   return <span className={`inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium ${cls}`}>{label}</span>;
 };
 
-export default function Transaksi({ auth, transactions, history }) {
+export default function Transaksi({ auth, transactions, history, storeSettings }) {
   const rows = transactions?.data || [];
   const historyRowsRaw = Array.isArray(history) ? history : (history?.data || []);
   const [historySearch, setHistorySearch] = useState('');
@@ -105,17 +105,11 @@ export default function Transaksi({ auth, transactions, history }) {
   const historyEndIndex = Math.min(historyStartIndex + historyPerPage, historyTotal);
   const historyVisibleRows = historyRows.slice(historyStartIndex, historyEndIndex);
   const [activeTab, setActiveTab] = useState('pending'); // 'pending' | 'history'
-  console.log('Received transactions:', rows);
+  
 
   // Debug first transaction if exists
   if (rows.length > 0) {
-    console.log('First transaction details:', {
-      created_at: rows[0].created_at,
-      date: rows[0].date,
-      items: rows[0].items,
-      total_amount: rows[0].total_amount,
-      raw: rows[0]
-    });
+    
   }
 
   const [currentTime, setCurrentTime] = useState(new Date());
@@ -143,13 +137,13 @@ export default function Transaksi({ auth, transactions, history }) {
         optionalServices: ['000018f0-0000-1000-8000-00805f9b34fb', 'e7810a71-73ae-499d-8c15-faa9aef0c3f2']
       });
       
-      console.log('Connecting to printer:', device.name);
+      
       await device.gatt.connect();
       setPrinterDevice(device);
       setPrinterConnected(true);
       return true;
     } catch (error) {
-      console.error('Error connecting to printer:', error);
+      
       setPrinterConnected(false);
       setPrinterDevice(null);
       alert('Gagal terhubung ke printer. Pastikan printer Bluetooth sudah dinyalakan dan dalam jangkauan.');
@@ -169,7 +163,7 @@ export default function Transaksi({ auth, transactions, history }) {
 
       const printReceipt = async (order) => {
     try {
-      console.log('Starting print process...');
+      
       // Gunakan printer yang sudah terhubung atau hubungkan yang baru
       const device = printerDevice || await navigator.bluetooth.requestDevice({
         filters: [
@@ -178,12 +172,12 @@ export default function Transaksi({ auth, transactions, history }) {
         ]
       });
 
-      console.log('Connecting to printer:', device.name);
+      
       const server = await device.gatt.connect();
       const service = await server.getPrimaryService('000018f0-0000-1000-8000-00805f9b34fb');
       const characteristic = await service.getCharacteristic('00002af1-0000-1000-8000-00805f9b34fb');
 
-      console.log('Preparing receipt data...');
+      
       // Format struk
       const formatDateTime = (dateObj) => {
         if (!dateObj || isNaN(dateObj)) return { date: '-', time: '-' };
@@ -203,7 +197,7 @@ export default function Transaksi({ auth, transactions, history }) {
             time: timeFormatter.format(dateObj)
           };
         } catch (error) {
-          console.error('Error formatting date:', error);
+          
           return { date: '-', time: '-' };
         }
       };
@@ -224,12 +218,28 @@ export default function Transaksi({ auth, transactions, history }) {
       const LARGE_ON = GS + '!' + '\x01'; // Large text
       const LARGE_OFF = GS + '!' + '\x00'; // Normal text
 
+      const name = (storeSettings && typeof storeSettings.store_name !== 'undefined'
+        ? String(storeSettings.store_name)
+        : 'SMART ORDER').trim() || 'SMART ORDER';
+      const address = storeSettings && typeof storeSettings.store_address !== 'undefined'
+        ? String(storeSettings.store_address).trim()
+        : '';
+      const phone = storeSettings && typeof storeSettings.store_phone !== 'undefined'
+        ? String(storeSettings.store_phone).trim()
+        : '';
+      const email = storeSettings && typeof storeSettings.store_email !== 'undefined'
+        ? String(storeSettings.store_email).trim()
+        : '';
+
+      
+
       const receipt = [
         INIT,
         CENTER,
-        DOUBLE_ON + 'SMART ORDER\n' + DOUBLE_OFF,
-        'Jl. Pegangsaan Timur No.123\n',
-        'Telp: 0812-3456-7890\n',
+        DOUBLE_ON + `${name}\n` + DOUBLE_OFF,
+        address ? `${address}\n` : '',
+        phone ? `Telp: ${phone}\n` : '',
+        email ? `Email: ${email}\n` : '',
         '\n',
         BOLD_ON + '========================\n' + BOLD_OFF,
         LEFT,
@@ -248,12 +258,14 @@ export default function Transaksi({ auth, transactions, history }) {
         return Math.round(num).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ".");
       };
 
-      // Tambahkan items
+      // Tambahkan items dan akumulasi subtotal keseluruhan
+      let itemsTotal = 0;
       order.items.forEach(item => {
         const rawPrice = (item.harga ?? item.price);
         const priceNum = typeof rawPrice === 'string' ? parseFloat(rawPrice) : Number(rawPrice);
         const qtyNum = Number(item.quantity ?? item.qty ?? 0);
         const subtotal = (item.subtotal != null) ? Number(item.subtotal) : (qtyNum * (isFinite(priceNum) ? priceNum : 0));
+        itemsTotal += (isFinite(subtotal) ? subtotal : 0);
         // Format item dengan padding untuk alignment
         const itemName = item.nama.length > 20 ? item.nama.substring(0, 17) + '...' : item.nama;
         const qtyStr = `${qtyNum}x`;
@@ -266,19 +278,28 @@ export default function Transaksi({ auth, transactions, history }) {
         );
       });
 
-      receipt.push(
-        BOLD_ON + '------------------------\n' + BOLD_OFF,
-        `Total     : Rp ${formatPrice(order.total_amount)}\n`,
-        `Pembayaran: ${order.payment_method.toUpperCase()}\n`
-      );
+      // Ringkasan biaya: Subtotal, Diskon (jika ada), Pajak (jika ada), Total
+      const discountAmount = Number(order.discount_amount || 0);
+      const taxAmount = Number(order.tax_amount || 0);
+
+      receipt.push(BOLD_ON + '-------------------------\n' + BOLD_OFF);
+      receipt.push(`Subtotal   : Rp ${formatPrice(itemsTotal)}\n`);
+      if (discountAmount > 0) {
+        receipt.push(`Diskon     : -Rp ${formatPrice(discountAmount)}\n`);
+      }
+      if (taxAmount > 0) {
+        receipt.push(`Pajak (PPN): Rp ${formatPrice(taxAmount)}\n`);
+      }
+      receipt.push(`Total      : Rp ${formatPrice(order.total_amount)}\n`);
+      receipt.push(`Pembayaran : ${order.payment_method.toUpperCase()}\n`);
 
       if (order.payment_method === 'cash') {
         const receivedRaw = (order.amount_received != null ? order.amount_received : cashReceived);
         const receivedNum = Number(receivedRaw || 0);
         const changeNum = Math.max(0, receivedNum - Number(order.total_amount || 0));
         receipt.push(
-          `Tunai     : Rp ${formatPrice(receivedNum)}\n`,
-          `Kembalian : Rp ${formatPrice(changeNum)}\n`
+          `Tunai      : Rp ${formatPrice(receivedNum)}\n`,
+          `Kembalian  : Rp ${formatPrice(changeNum)}\n`
         );
       }
 
@@ -287,26 +308,45 @@ export default function Transaksi({ auth, transactions, history }) {
         CENTER,
         'Terima Kasih\n',
         'Atas Kunjungan Anda\n\n',
-        'Semoga Anda Puas\n',
-        'Dengan Pelayanan Kami\n',
         '\n\n\n' // Extra lines for paper cutting
       );
 
       // Kirim ke printer dalam chunks
-      console.log('Encoding receipt data...');
+      
       const encoder = new TextEncoder();
       const fullData = encoder.encode(receipt.join(''));
-      console.log('Data size:', fullData.length, 'bytes');
+      
       
       // Kirim data dalam chunks
-      console.log('Sending data to printer in chunks...');
+      
       await writeToCharacteristic(characteristic, fullData);
       
-      console.log('Print successful');
+      
     } catch (error) {
-      console.error('Error printing:', error);
+      
       alert('Gagal mencetak struk. Pastikan printer Bluetooth sudah dinyalakan dan terhubung.');
     }
+  };
+
+  // Test print with dummy order (header uses storeSettings from database)
+  const handleTestPrint = async () => {
+    const now = new Date();
+    const pad = (n) => String(n).padStart(2, '0');
+    const createdAt = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
+    const testOrder = {
+      queue_number: 'TEST',
+      customer_name: 'Tes Cetak',
+      items: [
+        { id: 0, nama: 'Item Contoh', harga: 10000, quantity: 1, subtotal: 10000 },
+      ],
+      total_amount: 10000,
+      discount_amount: 0,
+      tax_amount: 0,
+      payment_method: 'cash',
+      amount_received: 10000,
+      created_at: createdAt,
+    };
+    await printReceipt(testOrder);
   };
   const [audioPermissionGranted, setAudioPermissionGranted] = useState(false);
   
@@ -320,9 +360,9 @@ export default function Transaksi({ auth, transactions, history }) {
       tempAudio.pause();
       tempAudio.currentTime = 0;
       setAudioPermissionGranted(true);
-      console.log('Audio permission granted');
+      
     } catch (error) {
-      console.log('Audio permission not granted:', error);
+      
       setAudioPermissionGranted(false);
     }
   };
@@ -333,23 +373,23 @@ export default function Transaksi({ auth, transactions, history }) {
       const audio = new Audio('/sounds/notification.wav');
       audio.volume = 0.8;
       audio.play().catch((error) => {
-        console.log('Failed to play with new Audio(), trying fallback...', error);
+        
         if (audioRef.current) {
           audioRef.current.volume = 0.8;
-          audioRef.current.play().catch(e => console.log('Fallback audio failed:', e));
+          audioRef.current.play().catch(e => {});
         }
       });
     } catch (error) {
-      console.log('Error creating audio:', error);
+      
       if (audioRef.current) {
         audioRef.current.volume = 0.8;
-        audioRef.current.play().catch(e => console.log('Fallback audio failed:', e));
+  audioRef.current.play().catch(e => {});
       }
     }
   };
 
   const openDetail = (t) => { 
-    console.log('Opening detail for transaction:', t);
+    
     setSelected(t); 
     setShowDetail(true); 
   };
@@ -410,7 +450,7 @@ export default function Transaksi({ auth, transactions, history }) {
 
   // Generic retry helpers
   const reloadWithRetry = (attempt = 1, max = 3) => {
-    router.reload({ only: ['transactions','history'],
+    router.reload({ only: ['transactions','history','storeSettings'],
       onError: () => {
         if (attempt < max) {
           setTimeout(() => reloadWithRetry(attempt + 1, max), attempt * 800);
@@ -459,9 +499,9 @@ export default function Transaksi({ auth, transactions, history }) {
         audio.pause();
         audio.currentTime = 0;
         setAudioPermissionGranted(true);
-        console.log('Audio permission already granted');
+        
       } catch (error) {
-        console.log('Audio permission needed:', error);
+        
         setAudioPermissionGranted(false);
       }
     };
@@ -479,17 +519,17 @@ export default function Transaksi({ auth, transactions, history }) {
           const audio = new Audio('/sounds/notification.wav');
           audio.volume = 0.8;
           audio.play().catch((error) => {
-            console.log('Failed to play with new Audio(), trying fallback...', error);
+            
             if (audioRef.current) {
               audioRef.current.volume = 0.8;
-              audioRef.current.play().catch(e => console.log('Fallback audio also failed:', e));
+              audioRef.current.play().catch(e => {});
             }
           });
         } catch (error) {
-          console.log('Error creating audio:', error);
+          
           if (audioRef.current) {
             audioRef.current.volume = 0.8;
-            audioRef.current.play().catch(e => console.log('Fallback audio failed:', e));
+            audioRef.current.play().catch(e => {});
           }
         }
       }
@@ -502,11 +542,11 @@ export default function Transaksi({ auth, transactions, history }) {
     };
 
     channel.listen('OrderStatusChanged', (e) => {
-      console.log('OrderStatusChanged event received:', e);
+      
       const status = e?.status; // Status ada di root object, bukan di e.transaction
       // If a transaction entered awaiting_confirmation, play a sound
       const shouldSound = status === 'awaiting_confirmation';
-      console.log('Should play sound:', shouldSound, 'Status:', status);
+      
       
       // Play sound immediately if status is awaiting_confirmation
       if (shouldSound) {
@@ -514,17 +554,17 @@ export default function Transaksi({ auth, transactions, history }) {
           const audio = new Audio('/sounds/notification.wav');
           audio.volume = 0.8;
           audio.play().catch((error) => {
-            console.log('Failed to play with new Audio(), trying fallback...', error);
+            
             if (audioRef.current) {
               audioRef.current.volume = 0.8;
-              audioRef.current.play().catch(e => console.log('Fallback audio failed:', e));
+              audioRef.current.play().catch(e => {});
             }
           });
         } catch (error) {
-          console.log('Error creating audio:', error);
+          
           if (audioRef.current) {
             audioRef.current.volume = 0.8;
-            audioRef.current.play().catch(e => console.log('Fallback audio failed:', e));
+            audioRef.current.play().catch(e => {});
           }
         }
       }
@@ -576,6 +616,16 @@ export default function Transaksi({ auth, transactions, history }) {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
               </svg>
               {printerConnected ? 'Printer Terhubung' : 'Hubungkan Printer'}
+            </button>
+            <button
+              onClick={handleTestPrint}
+              className="inline-flex items-center px-3 py-1.5 rounded text-sm font-medium transition-colors bg-blue-600 text-white hover:bg-blue-700"
+              title={`Header: ${(storeSettings?.store_name ?? 'SMART ORDER')} | ${(storeSettings?.store_address ?? '-')} | ${(storeSettings?.store_phone ?? '-')} | ${(storeSettings?.store_email ?? '-')}`}
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1.5" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M19 8H5a3 3 0 00-3 3v1a3 3 0 003 3h1v3a1 1 0 001 1h10a1 1 0 001-1v-3h1a3 3 0 003-3v-1a3 3 0 00-3-3zM16 18H8v-4h8v4zM17 4H7a1 1 0 00-1 1v2h12V5a1 1 0 00-1-1z" />
+              </svg>
+              Test Print
             </button>
           </div>
           <div className="flex items-center space-x-2 text-sm md:text-base">
@@ -893,10 +943,42 @@ export default function Transaksi({ auth, transactions, history }) {
                       <span className="text-sm font-semibold text-gray-700 dark:text-gray-200">Total</span>
                       <span className="text-sm font-semibold text-gray-900 dark:text-gray-100">{currencyIDR(selected.total_amount)}</span>
                     </div>
-                    <div className="bg-gray-50 dark:bg-gray-700/50 border-t border-gray-200 dark:border-gray-700 flex items-center justify-between px-3 py-2">
-                      <span className="text-sm text-gray-700 dark:text-gray-200">Total Items</span>
-                      <span className="text-sm text-gray-900 dark:text-gray-100">{selected.total_items}</span>
-                    </div>
+                    {/* Breakdown: Subtotal, Diskon, Pajak, Total Items */}
+                    {(() => {
+                      const items = Array.isArray(selected.items) ? selected.items : [];
+                      const itemsTotal = items.reduce((sum, it) => {
+                        const qty = Number(it.quantity ?? it.qty ?? 0);
+                        const price = Number(typeof (it.harga ?? it.price) === 'string' ? parseFloat((it.harga ?? it.price)) : (it.harga ?? it.price) || 0);
+                        const sub = it.subtotal != null ? Number(it.subtotal) : (isFinite(qty) && isFinite(price) ? qty * price : 0);
+                        return sum + (isFinite(sub) ? sub : 0);
+                      }, 0);
+                      const discount = Number(selected.discount_amount || 0);
+                      const tax = Number(selected.tax_amount || 0);
+                      return (
+                        <>
+                          <div className="bg-gray-50 dark:bg-gray-700/50 border-t border-gray-200 dark:border-gray-700 flex items-center justify-between px-3 py-2">
+                            <span className="text-sm text-gray-700 dark:text-gray-200">Subtotal</span>
+                            <span className="text-sm text-gray-900 dark:text-gray-100">{currencyIDR(itemsTotal)}</span>
+                          </div>
+                          {discount > 0 && (
+                            <div className="bg-gray-50 dark:bg-gray-700/50 border-t border-gray-200 dark:border-gray-700 flex items-center justify-between px-3 py-2">
+                              <span className="text-sm text-gray-700 dark:text-gray-200">Diskon</span>
+                              <span className="text-sm text-green-600 dark:text-green-400">- {currencyIDR(discount)}</span>
+                            </div>
+                          )}
+                          {tax > 0 && (
+                            <div className="bg-gray-50 dark:bg-gray-700/50 border-t border-gray-200 dark:border-gray-700 flex items-center justify-between px-3 py-2">
+                              <span className="text-sm text-gray-700 dark:text-gray-200">Pajak (PPN)</span>
+                              <span className="text-sm text-gray-900 dark:text-gray-100">{currencyIDR(tax)}</span>
+                            </div>
+                          )}
+                          <div className="bg-gray-50 dark:bg-gray-700/50 border-t border-gray-200 dark:border-gray-700 flex items-center justify-between px-3 py-2">
+                            <span className="text-sm text-gray-700 dark:text-gray-200">Total Items</span>
+                            <span className="text-sm text-gray-900 dark:text-gray-100">{selected.total_items}</span>
+                          </div>
+                        </>
+                      );
+                    })()}
                   </div>
                 </div>
 

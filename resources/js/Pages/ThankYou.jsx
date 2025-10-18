@@ -144,11 +144,38 @@ const ThankYou = ({ transaction }) => {
                                         ))}
                                     </div>
                                 </div>
-                                <div className="flex justify-between pt-2 mt-3 border-t border-gray-700">
-                                    <p className="font-semibold text-white">Total</p>
-                                    <p className="font-bold text-orange-500">
-                                        Rp {parseInt(transaction.total_amount).toLocaleString('id-ID')}
-                                    </p>
+                                <div className="space-y-2 pt-2 mt-3 border-t border-gray-700">
+                                    {transaction.discount_amount > 0 && (
+                                        <div className="flex justify-between">
+                                            <p className="text-gray-400">Subtotal</p>
+                                            <p className="text-white">
+                                                Rp {parseInt(transaction.total_amount - transaction.tax_amount + transaction.discount_amount).toLocaleString('id-ID')}
+                                            </p>
+                                        </div>
+                                    )}
+                                    
+                                    {transaction.discount_amount > 0 && (
+                                        <div className="flex justify-between">
+                                            <p className="text-gray-400">Discount</p>
+                                            <p className="text-green-400">
+                                                -Rp {parseInt(transaction.discount_amount).toLocaleString('id-ID')}
+                                            </p>
+                                        </div>
+                                    )}
+                                    
+                                    <div className="flex justify-between">
+                                        <p className="text-gray-400">Tax (PPN)</p>
+                                        <p className="text-white">
+                                            Rp {parseInt(transaction.tax_amount).toLocaleString('id-ID')}
+                                        </p>
+                                    </div>
+                                    
+                                    <div className="flex justify-between pt-2 border-t border-gray-700">
+                                        <p className="font-semibold text-white">Total</p>
+                                        <p className="font-bold text-orange-500">
+                                            Rp {parseInt(transaction.total_amount).toLocaleString('id-ID')}
+                                        </p>
+                                    </div>
                                 </div>
                                 
                                 {/* Order Notes (if any) */}

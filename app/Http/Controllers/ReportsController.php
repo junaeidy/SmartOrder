@@ -41,10 +41,14 @@ class ReportsController extends Controller
                 'payment_status' => $t->payment_status,
                 'status' => $t->status,
                 'total_amount' => $t->total_amount,
+                'discount_amount' => $t->discount_amount,
+                'tax_amount' => $t->tax_amount,
                 'total_items' => $t->total_items,
                 'queue_number' => $t->queue_number,
                 'paid_at' => $t->paid_at ? $t->paid_at->toDateTimeString() : null,
                 'items' => is_array($t->items) ? $t->items : [],
+                'amount_received' => $t->amount_received,
+                'change_amount' => $t->change_amount,
                 'is_paid' => in_array(strtolower((string)$t->payment_status), $paidStatuses),
             ];
         });
@@ -228,10 +232,14 @@ class ReportsController extends Controller
                 'payment_status' => $t->payment_status,
                 'status' => $t->status,
                 'total_amount' => $t->total_amount,
+                'discount_amount' => $t->discount_amount,
+                'tax_amount' => $t->tax_amount,
                 'total_items' => $t->total_items,
                 'queue_number' => $t->queue_number,
                 'paid_at' => $t->paid_at ? $t->paid_at->toDateTimeString() : null,
                 'items' => is_array($t->items) ? $t->items : [],
+                'amount_received' => $t->amount_received,
+                'change_amount' => $t->change_amount,
                 'is_paid' => in_array(strtolower((string)$t->payment_status), $paidStatuses),
             ];
         });

@@ -15,13 +15,14 @@ const Orders = ({ pendingOrders, completedOrders, auth }) => {
     const [currentPage, setCurrentPage] = useState(1);
     const [ordersPerPage] = useState(10);
     const audioRef = useRef(null);
+    const [audioPermissionGranted, setAudioPermissionGranted] = useState(false);
     
     useEffect(() => {
         const clockInterval = setInterval(() => {
             setCurrentTime(new Date());
         }, 1000);
         
-        const channel = window.Echo.channel('orders');
+    const channel = window.Echo.channel('orders');
         
         // Listen for new orders
         channel.listen('NewOrderReceived', (e) => {
@@ -34,7 +35,6 @@ const Orders = ({ pendingOrders, completedOrders, auth }) => {
             const audio = new Audio('/sounds/notification.wav');
             audio.volume = 0.8;
             audio.play().catch(error => {
-                console.warn('Autoplay blocked. Will play after user interaction.');
             });
         });
 
@@ -56,6 +56,37 @@ const Orders = ({ pendingOrders, completedOrders, auth }) => {
             clearInterval(clockInterval);
             window.Echo.leave('orders');
         };
+    }, []);
+
+    // Check and request audio permission helpers
+    const requestAudioPermission = async () => {
+        try {
+            const tempAudio = new Audio('/sounds/notification.wav');
+            tempAudio.volume = 0;
+            await tempAudio.play();
+            tempAudio.pause();
+            tempAudio.currentTime = 0;
+            setAudioPermissionGranted(true);
+            
+        } catch (error) {
+            setAudioPermissionGranted(false);
+        }
+    };
+
+    useEffect(() => {
+        // Attempt silent play to detect permission on mount
+        (async () => {
+            try {
+                const a = new Audio('/sounds/notification.wav');
+                a.volume = 0;
+                await a.play();
+                a.pause();
+                a.currentTime = 0;
+                setAudioPermissionGranted(true);
+            } catch (e) {
+                setAudioPermissionGranted(false);
+            }
+        })();
     }, []);
     
     useEffect(() => {
@@ -289,6 +320,29 @@ const Orders = ({ pendingOrders, completedOrders, auth }) => {
         >
             <Head title="Karyawan Orders" />
             
+            {/* Audio permission banner */}
+            {!audioPermissionGranted && (
+                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+                    <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4">
+                        <div className="flex">
+                            <div className="flex-shrink-0">
+                                <svg className="h-5 w-5 text-yellow-400" viewBox="0 0 20 20" fill="currentColor">
+                                    <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                                </svg>
+                            </div>
+                            <div className="ml-3">
+                                <p className="text-sm text-yellow-700">
+                                    Notifikasi suara tidak aktif.
+                                    <button onClick={requestAudioPermission} className="ml-2 font-medium text-yellow-700 underline hover:text-yellow-600">
+                                        Aktifkan notifikasi
+                                    </button>
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* Confirmation Modal */}
             <ConfirmationModal 
                 isOpen={showConfirmModal} 

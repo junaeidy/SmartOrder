@@ -1,14 +1,21 @@
 import { Head } from '@inertiajs/react';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { ShoppingCart, ArrowLeft, User, CreditCard } from 'lucide-react';
 import { router } from '@inertiajs/react';
 
-const Checkout = ({ products }) => {
+const Checkout = ({ products, taxPercentage = 11 }) => {
     const [customerData, setCustomerData] = useState(null);
     const [cartItems, setCartItems] = useState({});
     const [orderNotes, setOrderNotes] = useState('');
     const [loading, setLoading] = useState(false);
     const [paymentMethod, setPaymentMethod] = useState('cash'); // Default to cash
+    const [discountCode, setDiscountCode] = useState('');
+    const [discountError, setDiscountError] = useState('');
+    const [discountSuccess, setDiscountSuccess] = useState('');
+    const [discountInfo, setDiscountInfo] = useState(null);
+    const [checkingDiscount, setCheckingDiscount] = useState(false);
+    const [availabilityIssues, setAvailabilityIssues] = useState([]);
+    const [validatingCart, setValidatingCart] = useState(false);
 
     useEffect(() => {
         // Load customer data and cart items from session storage
@@ -23,6 +30,48 @@ const Checkout = ({ products }) => {
             setCartItems(JSON.parse(savedCart));
         }
     }, []);
+
+    // Build payload of current cart
+    const cartPayload = useMemo(() => ({
+        cartItems
+    }), [cartItems]);
+
+    // Validate cart availability when cart changes
+    useEffect(() => {
+        const validate = async () => {
+            if (!cartItems || Object.keys(cartItems).length === 0) {
+                setAvailabilityIssues([]);
+                return;
+            }
+            setValidatingCart(true);
+            try {
+                const { data } = await window.axios.post('/cart/validate', cartPayload);
+                setAvailabilityIssues(data.issues || []);
+            } catch (_) {
+                // Ignore network errors here, keep prior state
+            } finally {
+                setValidatingCart(false);
+            }
+        };
+        validate();
+    }, [cartPayload]);
+
+    // Subscribe to stock alerts to revalidate cart in realtime
+    useEffect(() => {
+        try {
+            const ch = window.Echo?.channel('products');
+            const handler = () => {
+                // Revalidate silently
+                window.axios.post('/cart/validate', cartPayload)
+                    .then(({ data }) => setAvailabilityIssues(data.issues || []))
+                    .catch(() => {});
+            };
+            ch?.listen('.ProductStockAlert', handler);
+            return () => {
+                window.Echo?.leave('products');
+            };
+        } catch (_) {}
+    }, [cartPayload]);
 
     // Calculate cart totals
     const calculateTotals = () => {
@@ -41,16 +90,62 @@ const Checkout = ({ products }) => {
     };
 
     const { totalItems, totalAmount } = calculateTotals();
+    
+    // Verify discount code
+    const verifyDiscountCode = () => {
+        if (!discountCode.trim()) {
+            setDiscountError('Silakan masukkan kode diskon');
+            return;
+        }
+        
+        setCheckingDiscount(true);
+        setDiscountError('');
+        setDiscountSuccess('');
+        setDiscountInfo(null);
+        
+        window.axios.post('/discount/verify', {
+            code: discountCode,
+            amount: totalAmount
+        })
+        .then(({ data }) => {
+            setCheckingDiscount(false);
+            if (data.success) {
+                setDiscountSuccess(data.message);
+                setDiscountInfo(data.discount);
+            } else {
+                setDiscountError(data.message || 'Kode diskon tidak valid');
+            }
+        })
+        .catch((error) => {
+            setCheckingDiscount(false);
+            const msg = error?.response?.data?.message || 'Gagal memeriksa kode diskon. Silakan coba lagi.';
+            setDiscountError(msg);
+            
+        });
+    };
 
     // Handle form submission for checkout
-    const handleCheckout = () => {
+    const handleCheckout = async () => {
         setLoading(true);
-        
+        // Final validation before submit
+        try {
+            const { data } = await window.axios.post('/cart/validate', cartPayload);
+            if (!data.success) {
+                setAvailabilityIssues(data.issues || []);
+                setLoading(false);
+                return;
+            }
+        } catch (_) {
+            setLoading(false);
+            return;
+        }
+
         router.post('/checkout/process', {
             customerData,
             cartItems,
             orderNotes,
-            paymentMethod
+            paymentMethod,
+            discountCode
         }, {
             onSuccess: () => {
                 // Clear cart after successful checkout
@@ -190,6 +285,7 @@ const Checkout = ({ products }) => {
                                     {Object.entries(cartItems).map(([productId, quantity]) => {
                                         const product = products.find(p => p.id == productId);
                                         if (!product) return null;
+                                        const issue = availabilityIssues.find(i => i.product_id == productId);
                                         
                                         return (
                                             <div key={productId} className="flex items-center justify-between pb-4 border-b border-gray-700">
@@ -204,6 +300,11 @@ const Checkout = ({ products }) => {
                                                     <div>
                                                         <div className="text-white font-medium">{product.nama}</div>
                                                         <div className="text-gray-400 text-sm">{quantity} x Rp {parseInt(product.harga).toLocaleString('id-ID')}</div>
+                                                        {issue && (
+                                                            <div className="text-xs mt-1 ${issue.reason === 'out_of_stock' || issue.reason === 'closed' ? 'text-red-400' : 'text-yellow-400'}">
+                                                                {issue.message} {issue.available ? `(tersedia: ${issue.available})` : ''}
+                                                            </div>
+                                                        )}
                                                     </div>
                                                 </div>
                                                 <div className="text-white font-semibold">
@@ -215,6 +316,55 @@ const Checkout = ({ products }) => {
                                 </div>
                                 
                                 {/* Order totals */}
+                                {/* Discount Code */}
+                                <div className="mb-4">
+                                    <label htmlFor="discountCode" className="block text-gray-400 text-sm mb-2">Kode Diskon (Opsional)</label>
+                                    <div className="flex space-x-2">
+                                        <input
+                                            id="discountCode"
+                                            type="text"
+                                            value={discountCode}
+                                            onChange={(e) => {
+                                                setDiscountCode(e.target.value);
+                                                setDiscountError('');
+                                                setDiscountSuccess('');
+                                                setDiscountInfo(null);
+                                            }}
+                                            placeholder="Masukkan kode diskon"
+                                            className={`flex-1 bg-gray-700 text-white rounded-lg p-3 focus:outline-none ${
+                                                discountError ? 'border border-red-500 focus:ring-2 focus:ring-red-500' :
+                                                discountSuccess ? 'border border-green-500 focus:ring-2 focus:ring-green-500' :
+                                                'focus:ring-2 focus:ring-orange-500'
+                                            }`}
+                                        />
+                                        <button
+                                            type="button"
+                                            onClick={verifyDiscountCode}
+                                            disabled={checkingDiscount}
+                                            className={`px-4 py-3 rounded-lg font-medium transition-all ${
+                                                checkingDiscount ? 'bg-gray-600 text-gray-300' : 'bg-orange-500 hover:bg-orange-600 text-white'
+                                            }`}
+                                        >
+                                            {checkingDiscount ? 'Memeriksa...' : 'Verifikasi'}
+                                        </button>
+                                    </div>
+                                    
+                                    {/* Discount feedback */}
+                                    {discountError && (
+                                        <p className="mt-2 text-sm text-red-400">{discountError}</p>
+                                    )}
+                                    
+                                    {discountSuccess && discountInfo && (
+                                        <div className="mt-2 p-2 bg-green-900/40 border border-green-700 rounded-lg">
+                                            <p className="text-sm text-green-400">{discountSuccess}</p>
+                                            <p className="text-xs text-green-300 mt-1">
+                                                {discountInfo.name} - {discountInfo.percentage}% diskon
+                                                {discountInfo.amount > 0 && ` (Rp ${parseInt(discountInfo.amount).toLocaleString('id-ID')})`}
+                                            </p>
+                                        </div>
+                                    )}
+                                </div>
+                                
                                 <div className="space-y-3 border-t border-gray-700 pt-4">
                                     <div className="flex justify-between text-gray-400">
                                         <span>Subtotal</span>
@@ -224,9 +374,26 @@ const Checkout = ({ products }) => {
                                         <span>Total Items</span>
                                         <span>{totalItems} items</span>
                                     </div>
+                                    
+                                    {discountInfo && (
+                                        <div className="flex justify-between text-green-400">
+                                            <span>Diskon ({discountInfo.percentage}%)</span>
+                                            <span>-Rp {parseInt(discountInfo.amount).toLocaleString('id-ID')}</span>
+                                        </div>
+                                    )}
+                                    
+                                    <div className="flex justify-between text-gray-400">
+                                        <span>Pajak (PPN)</span>
+                                        <span>{taxPercentage}%</span>
+                                    </div>
+                                    
                                     <div className="flex justify-between text-white text-lg font-bold pt-2 border-t border-gray-700">
                                         <span>Total</span>
-                                        <span className="text-orange-500">Rp {parseInt(totalAmount).toLocaleString('id-ID')}</span>
+                                        <span className="text-orange-500">
+                                            Rp {parseInt(
+                                                (totalAmount - (discountInfo?.amount || 0)) * (1 + taxPercentage/100)
+                                            ).toLocaleString('id-ID')}
+                                        </span>
                                     </div>
                                 </div>
                                 
@@ -246,12 +413,12 @@ const Checkout = ({ products }) => {
                                 {/* Checkout button */}
                                 <button
                                     onClick={handleCheckout}
-                                    disabled={loading}
+                                    disabled={loading || validatingCart || availabilityIssues.length > 0}
                                     className={`w-full mt-6 py-4 rounded-lg font-semibold text-white transition-all ${
-                                        loading ? 'bg-gray-600' : 'bg-orange-500 hover:bg-orange-600'
+                                        (loading || validatingCart || availabilityIssues.length > 0) ? 'bg-gray-600' : 'bg-orange-500 hover:bg-orange-600'
                                     }`}
                                 >
-                                    {loading ? 'Processing...' : 'Complete Order'}
+                                    {loading ? 'Processing...' : validatingCart ? 'Memvalidasi...' : availabilityIssues.length > 0 ? 'Perbaiki Ketersediaan' : 'Complete Order'}
                                 </button>
                             </div>
                         </div>

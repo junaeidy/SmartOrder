@@ -17,6 +17,9 @@ class Transaction extends Model
         'customer_notes',
         'total_amount',
         'total_items',
+        'discount_amount',
+        'tax_amount',
+        'discount_id',
         'amount_received',
         'change_amount',
         'payment_method',
@@ -38,5 +41,15 @@ class Transaction extends Model
         'confirmation_email_sent_at' => 'datetime',
         'amount_received' => 'decimal:2',
         'change_amount' => 'decimal:2',
+        'discount_amount' => 'decimal:2',
+        'tax_amount' => 'decimal:2',
     ];
+    
+    /**
+     * Get the discount applied to this transaction.
+     */
+    public function discount()
+    {
+        return $this->belongsTo(Discount::class);
+    }
 }

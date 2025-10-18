@@ -59,6 +59,21 @@ export default function Reports({ filters, summary, transactions, pagination, au
     const [showDetail, setShowDetail] = useState(false);
     const [selected, setSelected] = useState(null);
 
+    // Hitung subtotal berdasarkan jumlah subtotal item (qty * price atau field subtotal)
+    const itemsSubtotal = useMemo(() => {
+        if (!selected || !Array.isArray(selected.items)) return 0;
+        try {
+            return selected.items.reduce((sum, it) => {
+                const qty = Number(it?.quantity ?? it?.qty ?? 0);
+                const price = Number(it?.harga ?? it?.price ?? 0);
+                const sub = Number(it?.subtotal != null ? it.subtotal : qty * price);
+                return sum + (isNaN(sub) ? 0 : sub);
+            }, 0);
+        } catch (e) {
+            return 0;
+        }
+    }, [selected]);
+
     const apply = () => {
         router.get(route('admin.reports'), local, { preserveState: true, replace: true });
     };
@@ -371,15 +386,49 @@ export default function Reports({ filters, summary, transactions, pagination, au
                                             </table>
                                         </div>
                                         {/* Totals area kept visible */}
-                                        <div className="bg-gray-50 dark:bg-gray-700/50 border-t border-gray-200 dark:border-gray-700 flex items-center justify-between px-3 py-2">
-                                            <span className="text-sm font-semibold text-gray-700 dark:text-gray-200">Total</span>
-                                            <span className="text-sm font-semibold text-gray-900 dark:text-gray-100">{selected.is_paid ? currencyIDR(selected.total_amount) : '-'}</span>
-                                        </div>
-                                        <div className="bg-gray-50 dark:bg-gray-700/50 border-t border-gray-200 dark:border-gray-700 flex items-center justify-between px-3 py-2">
-                                            <span className="text-sm text-gray-700 dark:text-gray-200">Total Items</span>
-                                            <span className="text-sm text-gray-900 dark:text-gray-100">{selected.total_items}</span>
+                                        <div className="bg-gray-50 dark:bg-gray-700/50 border-t border-gray-200 dark:border-gray-700 px-3 py-2 space-y-1">
+                                            <div className="flex items-center justify-between">
+                                                <span className="text-sm text-gray-700 dark:text-gray-200">Subtotal</span>
+                                                <span className="text-sm text-gray-900 dark:text-gray-100">{currencyIDR(itemsSubtotal)}</span>
+                                            </div>
+                                            <div className="flex items-center justify-between">
+                                                <span className="text-sm text-gray-700 dark:text-gray-200">Diskon</span>
+                                                <span className="text-sm text-gray-900 dark:text-gray-100">- {currencyIDR(selected.discount_amount || 0)}</span>
+                                            </div>
+                                            <div className="flex items-center justify-between">
+                                                <span className="text-sm text-gray-700 dark:text-gray-200">Pajak</span>
+                                                <span className="text-sm text-gray-900 dark:text-gray-100">{currencyIDR(selected.tax_amount || 0)}</span>
+                                            </div>
+                                            <div className="flex items-center justify-between">
+                                                <span className="text-sm font-semibold text-gray-700 dark:text-gray-200">Total</span>
+                                                <span className="text-sm font-semibold text-gray-900 dark:text-gray-100">{selected.is_paid ? currencyIDR(selected.total_amount) : '-'}</span>
+                                            </div>
+                                            <div className="flex items-center justify-between">
+                                                <span className="text-sm text-gray-700 dark:text-gray-200">Total Items</span>
+                                                <span className="text-sm text-gray-900 dark:text-gray-100">{selected.total_items}</span>
+                                            </div>
                                         </div>
                                     </div>
+                                </div>
+
+                                {/* Payment Details (Cash) */}
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
+                                    <div className="text-sm">
+                                        <div className="text-gray-500 dark:text-gray-400">Metode Pembayaran</div>
+                                        <div className="font-medium capitalize">{selected.payment_method}</div>
+                                    </div>
+                                    {selected.payment_method === 'cash' && (
+                                        <>
+                                            <div className="text-sm">
+                                                <div className="text-gray-500 dark:text-gray-400">Uang Diterima</div>
+                                                <div className="font-medium">{selected.amount_received ? currencyIDR(selected.amount_received) : '-'}</div>
+                                            </div>
+                                            <div className="text-sm">
+                                                <div className="text-gray-500 dark:text-gray-400">Kembalian</div>
+                                                <div className="font-medium">{selected.change_amount ? currencyIDR(selected.change_amount) : '-'}</div>
+                                            </div>
+                                        </>
+                                    )}
                                 </div>
 
                                 <div className="mt-4 flex justify-end">

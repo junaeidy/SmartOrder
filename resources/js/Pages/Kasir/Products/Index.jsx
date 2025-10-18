@@ -11,6 +11,8 @@ import {
   Package,
   XCircle,
   Save,
+  EyeOff,
+  Eye,
 } from "lucide-react";
 
 export default function Index({ products, filters }) {
@@ -294,6 +296,7 @@ export default function Index({ products, filters }) {
                 <th className="p-4">Harga</th>
                 <th className="p-4">Stok</th>
                 <th className="p-4">Gambar</th>
+                <th className="p-4">Status</th>
                 <th className="p-4 text-center">Aksi</th>
               </tr>
             </thead>
@@ -329,6 +332,17 @@ export default function Index({ products, filters }) {
                         </span>
                       )}
                     </td>
+                    <td className="p-4">
+                      {product.closed ? (
+                        <span className="inline-flex items-center text-xs px-2 py-1 rounded bg-gray-200 text-gray-700">
+                          <EyeOff className="w-3 h-3 mr-1" /> Ditutup
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center text-xs px-2 py-1 rounded bg-green-200 text-green-700">
+                          <Eye className="w-3 h-3 mr-1" /> Dibuka
+                        </span>
+                      )}
+                    </td>
                     <td className="p-4 text-center space-x-2">
                       <button
                         onClick={() => handleEdit(product)}
@@ -341,6 +355,13 @@ export default function Index({ products, filters }) {
                         className="bg-red-600 hover:bg-red-700 text-white p-2 rounded-full"
                       >
                         <Trash2 className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => router.put(route('products.toggleClosed', product.id))}
+                        className={`p-2 rounded-full ${product.closed ? 'bg-green-600 hover:bg-green-700' : 'bg-gray-600 hover:bg-gray-700'} text-white`}
+                        title={product.closed ? 'Buka kembali' : 'Tutup sementara'}
+                      >
+                        {product.closed ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
                       </button>
                     </td>
                   </tr>

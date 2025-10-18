@@ -1,8 +1,8 @@
 import { Head, Link } from '@inertiajs/react';
 import React, { useState, useEffect } from 'react';
-import { ShoppingCart, Plus, Minus, Home, User, X, ChevronRight, ArrowLeft } from 'lucide-react';
+import { ShoppingCart, Plus, Minus, Home, User, X, ChevronRight, ArrowLeft, Clock, AlertTriangle, AlertOctagon } from 'lucide-react';
 
-const Welcome = ({ products }) => {
+const Welcome = ({ products, isStoreOpen, storeHours }) => {
     const [step, setStep] = useState(1);
     const [customerData, setCustomerData] = useState(null);
     const [cartItems, setCartItems] = useState({});
@@ -27,10 +27,41 @@ const Welcome = ({ products }) => {
         setStep(3);
     };
 
+    // Helper to convert day number to name
+    const getDayName = (dayNum) => {
+        const days = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+        return days[dayNum];
+    };
+    
+    // Helper to format hours for display
+    const formatHours = (timeString) => {
+        if (!timeString) return '';
+        const [hours, minutes] = timeString.split(':');
+        return `${hours}:${minutes}`;
+    };
+    
+    // Get today's hours
+    const getCurrentDayHours = () => {
+        if (!storeHours) return { open: '08:00', close: '20:00' };
+        const today = getDayName(new Date().getDay());
+        return storeHours[today] || { open: '08:00', close: '20:00' };
+    };
+    
     // Step 1: Welcome
     const WelcomeScreen = () => (
         <div className="min-h-screen flex items-center justify-center bg-gray-900 px-6">
             <div className="text-center w-full max-w-2xl">
+                {!isStoreOpen && (
+                    <div className="mb-8 p-4 bg-red-900/60 border border-red-500 rounded-lg">
+                        <div className="flex items-center justify-center mb-2">
+                            <AlertTriangle className="w-6 h-6 text-red-400 mr-2" />
+                            <h2 className="text-xl font-bold text-red-400">Toko Tutup</h2>
+                        </div>
+                        <p className="text-gray-300">
+                            Saat ini toko sedang tutup. Jam operasional hari ini: {formatHours(getCurrentDayHours().open)} - {formatHours(getCurrentDayHours().close)}
+                        </p>
+                    </div>
+                )}
                 <div className="mb-8">
                     <User className="w-20 h-20 sm:w-24 sm:h-24 text-orange-500 mx-auto" />
                 </div>
@@ -42,10 +73,17 @@ const Welcome = ({ products }) => {
                 </p>
                 <button
                     onClick={() => setStep(2)}
-                    className="px-6 sm:px-8 py-3 sm:py-4 bg-orange-500 text-white rounded-lg text-lg sm:text-xl font-semibold hover:bg-orange-600 transition-all transform hover:scale-105 shadow-lg w-full sm:w-auto"
+                    className={`px-6 sm:px-8 py-3 sm:py-4 bg-orange-500 text-white rounded-lg text-lg sm:text-xl font-semibold hover:bg-orange-600 transition-all transform hover:scale-105 shadow-lg w-full sm:w-auto ${!isStoreOpen ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    disabled={!isStoreOpen}
                 >
-                    Start Your Order
+                    {isStoreOpen ? 'Start Your Order' : 'Toko Sedang Tutup'}
                 </button>
+                
+                {!isStoreOpen && (
+                    <div className="mt-6 text-gray-400 text-sm">
+                        <p>Silakan kembali pada jam operasional.</p>
+                    </div>
+                )}
             </div>
         </div>
     );
@@ -221,9 +259,15 @@ const Welcome = ({ products }) => {
                                             className="w-full aspect-video object-cover"
                                         />
                                     )}
-                                    {product.stok <= 0 && (
+                                    {(product.stok <= 0 || product.closed) && (
                                         <div className="absolute inset-0 bg-black bg-opacity-70 flex items-center justify-center">
-                                            <span className="text-white font-semibold text-sm sm:text-base">Out of Stock</span>
+                                            <span className="text-white font-semibold text-sm sm:text-base">{product.stok <= 0 ? 'Out of Stock' : 'Ditutup Sementara'}</span>
+                                        </div>
+                                    )}
+                                    {product.stok > 0 && product.stok <= 20 && !product.closed && (
+                                        <div className="absolute top-2 left-2 bg-yellow-500 text-black text-xs px-2 py-1 rounded flex items-center">
+                                            <AlertOctagon className="w-3 h-3 mr-1" />
+                                            Stok menipis
                                         </div>
                                     )}
                                 </div>
@@ -231,12 +275,12 @@ const Welcome = ({ products }) => {
                                     <h3 className="text-sm sm:text-lg font-semibold text-white line-clamp-2">
                                         {product.nama}
                                     </h3>
-                                    <p className="text-gray-400 text-xs sm:text-sm">Stock: {product.stok}</p>
+                                    <p className="text-gray-400 text-xs sm:text-sm">Stock: {product.stok} {product.closed && <span className="ml-1 text-red-400">(Ditutup)</span>}</p>
                                     <div className="mt-auto flex items-center justify-between pt-3">
                                         <span className="text-base sm:text-xl font-bold text-orange-500">
                                             Rp {parseInt(product.harga).toLocaleString('id-ID')}
                                         </span>
-                                        {product.stok > 0 ? (
+                                        {product.stok > 0 && !product.closed ? (
                                             cartItems[product.id] ? (
                                                 <div className="flex items-center space-x-1 sm:space-x-2">
                                                     <button
@@ -267,7 +311,7 @@ const Welcome = ({ products }) => {
                                                 className="px-3 sm:px-4 py-1.5 sm:py-2 bg-gray-700 text-gray-400 rounded-lg text-sm sm:text-base cursor-not-allowed"
                                                 disabled
                                             >
-                                                Out
+                                                {product.stok <= 0 ? 'Out' : 'Ditutup'}
                                             </button>
                                         )}
                                     </div>
