@@ -83,8 +83,9 @@ class CheckoutController extends Controller
         $kodeTransaksi = $this->generateKodeTransaksi();
 
         $paymentMethod = $request->paymentMethod;
-        $initialStatus = ($paymentMethod === 'cash') ? 'waiting' : 'waiting_for_payment';
-        $paymentStatus = ($paymentMethod === 'cash') ? 'paid' : 'pending';
+    // For cash: do NOT mark as paid yet to avoid confusion; cashier will confirm later
+    $initialStatus = ($paymentMethod === 'cash') ? 'waiting' : 'waiting_for_payment';
+    $paymentStatus = ($paymentMethod === 'cash') ? 'pending' : 'pending';
         
         $transaction = Transaction::create([
             'kode_transaksi' => $kodeTransaksi,
@@ -125,7 +126,7 @@ class CheckoutController extends Controller
             ]);
         }
 
-        // For cash payments, proceed normally
+    // For cash payments, proceed normally (email + broadcast), but payment_status remains pending
         // Send email confirmation
         try {
             Mail::to($customerData['email'])->send(new OrderConfirmation($transaction));

@@ -40,7 +40,7 @@ class KaryawanOrderController extends Controller
                         'items' => $transaction->items,
                     ];
                 }),
-            'completedOrders' => Transaction::where('status', 'completed')
+            'completedOrders' => Transaction::whereIn('status', ['completed', 'awaiting_confirmation'])
                 ->whereBetween('created_at', [$today, $todayEnd])
                 ->orderBy('updated_at', 'desc')
                 ->get()
@@ -61,10 +61,10 @@ class KaryawanOrderController extends Controller
     public function processOrder(Request $request, Transaction $transaction)
     {
         $request->validate([
-            'status' => 'required|in:completed,canceled',
+            'status' => 'required|in:awaiting_confirmation',
         ]);
 
-        $transaction->status = $request->status;
+        $transaction->status = $request->status; // move to cashier confirmation stage
         $transaction->save();
 
         // Broadcast status change for realtime dashboards

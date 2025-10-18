@@ -23,17 +23,33 @@ const Orders = ({ pendingOrders, completedOrders, auth }) => {
         
         const channel = window.Echo.channel('orders');
         
+        // Listen for new orders
         channel.listen('NewOrderReceived', (e) => {
             setOrders(prev => {
                 const exists = prev.some(o => o.id === e.transaction.id);
                 return exists ? prev : [...prev, e.transaction];
             });
             
+            // Play sound for new orders
             const audio = new Audio('/sounds/notification.wav');
             audio.volume = 0.8;
             audio.play().catch(error => {
                 console.warn('Autoplay blocked. Will play after user interaction.');
             });
+        });
+
+        // Listen for status changes but don't play sound
+        channel.listen('OrderStatusChanged', (e) => {
+            if (e?.transaction) {
+                setOrders(prev => {
+                    // Remove order if it's moved to awaiting_confirmation
+                    if (e.transaction.status === 'awaiting_confirmation') {
+                        return prev.filter(o => o.id !== e.transaction.id);
+                    }
+                    // Update the order if status changed
+                    return prev.map(o => o.id === e.transaction.id ? e.transaction : o);
+                });
+            }
         });
             
         return () => {
@@ -192,7 +208,7 @@ const Orders = ({ pendingOrders, completedOrders, auth }) => {
                     {/* Header */}
                     <div className="bg-gray-700 px-6 py-4 flex items-center">
                         <AlertCircle className="text-orange-400 w-6 h-6 mr-3" />
-                        <h3 className="text-xl font-semibold text-white">Complete Order</h3>
+                        <h3 className="text-xl font-semibold text-white">Kirim ke Kasir</h3>
                     </div>
                     
                     {/* Body */}
@@ -200,7 +216,7 @@ const Orders = ({ pendingOrders, completedOrders, auth }) => {
                         <p className={`text-gray-300 mb-6 transition-all duration-500 ${
                             isOpen ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-4'
                         }`}>
-                            Are you sure you want to mark order #{order?.queue_number} for <span className="text-white font-medium">{order?.customer_name}</span> as completed?
+                            Apakah Anda ingin mengirim pesanan #{order?.queue_number} milik <span className="text-white font-medium">{order?.customer_name}</span> ke kasir untuk konfirmasi?
                         </p>
                         
                         {/* Order summary */}
@@ -236,7 +252,7 @@ const Orders = ({ pendingOrders, completedOrders, auth }) => {
                                 }`}
                             >
                                 <CheckCircle className="w-5 h-5 mr-2" />
-                                <span>{processing ? 'Processing...' : 'Complete Order'}</span>
+                                <span>{processing ? 'Processing...' : 'Kirim ke Kasir'}</span>
                             </button>
                             <button 
                                 onClick={handleClose}
@@ -278,7 +294,7 @@ const Orders = ({ pendingOrders, completedOrders, auth }) => {
                 isOpen={showConfirmModal} 
                 onClose={() => setShowConfirmModal(false)}
                 onConfirm={() => {
-                    handleProcessOrder(selectedOrder, 'completed');
+                    handleProcessOrder(selectedOrder, 'awaiting_confirmation');
                     setShowConfirmModal(false);
                 }}
                 order={selectedOrder}
@@ -305,7 +321,7 @@ const Orders = ({ pendingOrders, completedOrders, auth }) => {
                                         : 'border-transparent text-gray-400 hover:text-gray-300 hover:border-gray-400'
                                 }`}
                             >
-                                Pending Orders
+                                Pesanan Tertunda
                                 <span className="ml-2 bg-orange-500 px-2 py-0.5 rounded-full text-xs text-white">
                                     {orders.length}
                                 </span>
@@ -319,7 +335,7 @@ const Orders = ({ pendingOrders, completedOrders, auth }) => {
                                         : 'border-transparent text-gray-400 hover:text-gray-300 hover:border-gray-400'
                                 }`}
                             >
-                                Completed Today
+                                Pesanan Selesai
                                 <span className="ml-2 bg-green-600 px-2 py-0.5 rounded-full text-xs text-white">
                                     {completedOrders.length}
                                 </span>
@@ -330,14 +346,14 @@ const Orders = ({ pendingOrders, completedOrders, auth }) => {
                     {activeTab === 'pending' && (
                         <>
                             <div className="mb-2 flex justify-between items-center">
-                                <h2 className="text-xl font-semibold">Pending Orders</h2>
+                                <h2 className="text-xl font-semibold">Pesanan Tertunda</h2>
                                 <span className="bg-orange-500 px-3 py-1 rounded-full text-sm font-medium">
-                                    {orders.length} Pending
+                                    {orders.length} Antrian
                                 </span>
                             </div>
                             
                             <div className="mb-6 bg-blue-900/30 border border-blue-800 rounded-lg p-4 text-blue-200">
-                                <p>Click on any order card to mark it as completed. New orders will appear automatically with a sound notification.</p>
+                                <p>Klik kartu pesanan untuk mengirim ke kasir (menunggu konfirmasi). Pesanan baru akan muncul otomatis disertai suara notifikasi.</p>
                             </div>
                         </>
                     )}
@@ -345,7 +361,7 @@ const Orders = ({ pendingOrders, completedOrders, auth }) => {
                     {activeTab === 'pending' && (
                         orders.length === 0 ? (
                             <div className="bg-gray-800 rounded-lg shadow-md p-6 text-center">
-                                <p className="text-gray-400">No pending orders at the moment.</p>
+                                <p className="text-gray-400">Tidak ada pesanan tertunda saat ini.</p>
                             </div>
                         ) : (
                             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">

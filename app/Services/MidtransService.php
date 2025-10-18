@@ -141,21 +141,23 @@ class MidtransService
             try {
                 // Use the midtrans_transaction_id to check status with Midtrans
                 $status = MidtransTransaction::status($transaction->midtrans_transaction_id);
-                
-                \Illuminate\Support\Facades\Log::info('Midtrans API response: ', ['status' => $status]);
-                
+                // Normalize to object for consistent property access
+                $statusObj = is_array($status) ? (object) $status : $status;
+
+                \Illuminate\Support\Facades\Log::info('Midtrans API response: ', ['status' => is_object($statusObj) ? (array) $statusObj : $statusObj]);
+
                 // Update transaction in database
                 // Normalize our payment_status while preserving original Midtrans status
-                $transaction->midtrans_transaction_status = $status->transaction_status;
-                if (in_array($status->transaction_status, ['settlement', 'capture'])) {
+                $transaction->midtrans_transaction_status = $statusObj->transaction_status ?? null;
+                if (in_array($statusObj->transaction_status ?? '', ['settlement', 'capture'])) {
                     $transaction->payment_status = 'paid';
                     $transaction->status = 'waiting'; // Show in karyawan order management
                     $transaction->paid_at = now();
-                } elseif ($status->transaction_status === 'pending') {
+                } elseif (($statusObj->transaction_status ?? null) === 'pending') {
                     $transaction->payment_status = 'pending';
-                } elseif (in_array($status->transaction_status, ['deny', 'cancel'])) {
+                } elseif (in_array($statusObj->transaction_status ?? '', ['deny', 'cancel'])) {
                     $transaction->payment_status = 'failed';
-                } elseif ($status->transaction_status === 'expire') {
+                } elseif (($statusObj->transaction_status ?? null) === 'expire') {
                     $transaction->payment_status = 'expired';
                 } else {
                     // Fallback to pending for any unknown status

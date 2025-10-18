@@ -23,7 +23,7 @@ export default function Sidebar() {
     ],
     kasir: [
       { label: "Dashboard", icon: <Home size={18} />, href: "/kasir/dashboard" },
-      { label: "Transaksi", icon: <ShoppingCart size={18} />, href: "/kasir/transaksi" },
+      { label: "Transaksi", icon: <ShoppingCart size={18} />, href: route("kasir.transaksi") },
       { label: "Riwayat", icon: <ClipboardList size={18} />, href: "/kasir/riwayat" },
       { label: "Laporan", icon: <Grid2X2PlusIcon size={18} />, href: route("kasir.reports") },
       { label: "Produk", icon: <Donut size={18} />, href: route("products.index") },

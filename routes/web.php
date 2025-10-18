@@ -58,6 +58,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/kasir/reports', [App\Http\Controllers\ReportsController::class, 'index'])->name('kasir.reports');
         Route::get('/kasir/reports/export/excel', [App\Http\Controllers\ReportsController::class, 'exportExcel'])->name('kasir.reports.export.excel');
         Route::get('/kasir/reports/export/pdf', [App\Http\Controllers\ReportsController::class, 'exportPdf'])->name('kasir.reports.export.pdf');
+        // Transaksi (confirmation)
+        Route::get('/kasir/transaksi', [App\Http\Controllers\KasirTransactionController::class, 'index'])->name('kasir.transaksi');
+        Route::put('/kasir/transaksi/{transaction}/confirm', [App\Http\Controllers\KasirTransactionController::class, 'confirm'])->name('kasir.transaksi.confirm');
+        Route::put('/kasir/transaksi/{transaction}/cancel', [App\Http\Controllers\KasirTransactionController::class, 'cancel'])->name('kasir.transaksi.cancel');
     });
 
     Route::middleware(['role:karyawan'])->group(function () {
