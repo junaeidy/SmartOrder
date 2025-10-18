@@ -51,14 +51,60 @@ const PaymentBadge = ({ status }) => {
   const s = (status || '').toLowerCase();
   let cls = 'bg-gray-200 text-gray-800';
   let label = status || 'N/A';
-  if (s === 'paid' || s === 'settlement' || s === 'capture') { cls = 'bg-green-100 text-green-700'; label = 'Paid'; }
-  else if (s === 'pending') { cls = 'bg-yellow-100 text-yellow-700'; label = 'Pending'; }
-  else if (s === 'canceled' || s === 'failed' || s === 'expire' || s === 'expired' || s === 'deny') { cls = 'bg-red-100 text-red-700'; label = 'Canceled'; }
+  if (s === 'paid' || s === 'settlement' || s === 'capture') { cls = 'bg-green-100 text-green-700'; label = 'Lunas'; }
+  else if (s === 'pending') { cls = 'bg-yellow-100 text-yellow-700'; label = 'Menunggu'; }
+  else if (s === 'canceled' || s === 'failed' || s === 'expire' || s === 'expired' || s === 'deny') { cls = 'bg-red-100 text-red-700'; label = 'Dibatalkan'; }
   return <span className={`inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium ${cls}`}>{label}</span>;
 };
 
-export default function Transaksi({ auth, transactions }) {
+// Visual badge for payment method (cash/online variants)
+const MethodBadge = ({ method }) => {
+  const m = (method || '').toLowerCase();
+  const map = {
+    cash: { cls: 'bg-green-100 text-green-700', label: 'Cash' },
+  };
+  const conf = map[m] || { cls: 'bg-blue-100 text-blue-700 capitalize', label: (method || 'Online').toString() };
+  return <span className={`inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium ${conf.cls}`}>{conf.label}</span>;
+};
+
+// Visual badge for order status (completed/awaiting_confirmation/canceled/etc)
+const OrderStatusBadge = ({ status }) => {
+  const s = (status || '').toLowerCase();
+  let cls = 'bg-gray-200 text-gray-800';
+  let label = status || 'N/A';
+  if (['completed', 'done', 'success', 'finished'].includes(s)) { cls = 'bg-green-100 text-green-700'; label = 'Selesai'; }
+  else if (['awaiting_confirmation', 'waiting', 'waiting_confirmation', 'awaiting', 'menunggu_konfirmasi'].includes(s)) { cls = 'bg-yellow-100 text-yellow-700'; label = 'Menunggu'; }
+  else if (['canceled', 'cancelled', 'failed', 'expired', 'expire', 'deny', 'rejected'].includes(s)) { cls = 'bg-red-100 text-red-700'; label = 'Dibatalkan'; }
+  else if (['processing', 'in_progress', 'preparing', 'on_progress'].includes(s)) { cls = 'bg-indigo-100 text-indigo-700'; label = 'Diproses'; }
+  return <span className={`inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium ${cls}`}>{label}</span>;
+};
+
+export default function Transaksi({ auth, transactions, history }) {
   const rows = transactions?.data || [];
+  const historyRowsRaw = Array.isArray(history) ? history : (history?.data || []);
+  const [historySearch, setHistorySearch] = useState('');
+  const [historyPage, setHistoryPage] = useState(1);
+  const historyRows = historyRowsRaw.filter((t) => {
+    if (!historySearch.trim()) return true;
+    const q = historySearch.toLowerCase();
+    const hay = [
+      t.kode_transaksi,
+      t.queue_number?.toString(),
+      t.customer_name,
+      t.customer_phone,
+      t.payment_method,
+      t.payment_status,
+      t.status,
+    ].map(v => (v ?? '').toString().toLowerCase());
+    return hay.some(s => s.includes(q));
+  });
+  const historyPerPage = 20;
+  const historyTotal = historyRows.length;
+  const historyTotalPages = Math.max(1, Math.ceil(historyTotal / historyPerPage));
+  const historyStartIndex = (historyPage - 1) * historyPerPage;
+  const historyEndIndex = Math.min(historyStartIndex + historyPerPage, historyTotal);
+  const historyVisibleRows = historyRows.slice(historyStartIndex, historyEndIndex);
+  const [activeTab, setActiveTab] = useState('pending'); // 'pending' | 'history'
   console.log('Received transactions:', rows);
 
   // Debug first transaction if exists
@@ -364,7 +410,7 @@ export default function Transaksi({ auth, transactions }) {
 
   // Generic retry helpers
   const reloadWithRetry = (attempt = 1, max = 3) => {
-    router.reload({ only: ['transactions'],
+    router.reload({ only: ['transactions','history'],
       onError: () => {
         if (attempt < max) {
           setTimeout(() => reloadWithRetry(attempt + 1, max), attempt * 800);
@@ -372,6 +418,14 @@ export default function Transaksi({ auth, transactions }) {
       }
     });
   };
+
+  // Reset history page on search or when switching to history tab
+  useEffect(() => {
+    setHistoryPage(1);
+  }, [historySearch]);
+  useEffect(() => {
+    if (activeTab === 'history') setHistoryPage(1);
+  }, [activeTab]);
   const putWithRetry = (url, data = {}, attempt = 1, max = 3, onSuccess = null) => {
     router.put(url, data, {
       preserveScroll: true,
@@ -562,35 +616,64 @@ export default function Transaksi({ auth, transactions }) {
       )}
 
       <div className="py-6 max-w-7xl mx-auto sm:px-6 lg:px-8 space-y-6">
-        {rows.length === 0 ? (
-          <div className="bg-white dark:bg-gray-800 rounded-xl shadow p-6 text-center">Tidak ada transaksi menunggu konfirmasi.</div>
-        ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {rows.map((t) => (
+        {/* Tabs (mimic Orders.jsx) */}
+        <div className="mb-2 border-b border-gray-700">
+          <nav className="flex space-x-8">
+            <button
+              onClick={() => setActiveTab('pending')}
+              className={`py-3 px-1 border-b-2 font-medium text-sm transition-colors duration-200 ${
+                activeTab === 'pending'
+                  ? 'border-orange-500 text-orange-500'
+                  : 'border-transparent text-gray-400 hover:text-gray-300 hover:border-gray-400'
+              }`}
+            >
+              Menunggu Konfirmasi
+              <span className="ml-2 bg-orange-500 px-2 py-0.5 rounded-full text-xs text-white">
+                {typeof transactions?.total === 'number' ? transactions.total : (rows?.length || 0)}
+              </span>
+            </button>
+            <button
+              onClick={() => setActiveTab('history')}
+              className={`py-3 px-1 border-b-2 font-medium text-sm transition-colors duration-200 ${
+                activeTab === 'history'
+                  ? 'border-indigo-500 text-indigo-500'
+                  : 'border-transparent text-gray-400 hover:text-gray-300 hover:border-gray-400'
+              }`}
+            >
+              Riwayat
+              <span className="ml-2 bg-indigo-600 px-2 py-0.5 rounded-full text-xs text-white">
+                {historyRowsRaw?.length || 0}
+              </span>
+            </button>
+          </nav>
+        </div>
+        {activeTab === 'pending' && (
+          rows.length === 0 ? (
+            <div className="bg-white dark:bg-gray-800 rounded-xl shadow p-6 text-center">Tidak ada transaksi menunggu konfirmasi.</div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {rows.map((t) => (
               <div key={t.id} className="bg-gray-800 rounded-lg shadow-md overflow-hidden border-l-4 border-orange-500 transition-all hover:shadow-lg cursor-pointer" onClick={() => openDetail(t)}>
                 <div className="p-5">
                   <div className="flex justify-between items-center mb-3">
-                      <div className="flex items-center">
+                    <div className="flex items-center">
                       <span className="bg-orange-500/20 text-orange-400 px-3 py-1.5 rounded text-base font-bold">#{t.queue_number}</span>
                       <div className="flex items-center ml-2 bg-blue-900/30 px-2 py-1 rounded">
+                        <ClockIcon className="w-3 h-3 text-blue-300 mr-1" />
                         <span className="text-xs text-blue-300">
                           {(() => {
                             const d = resolveTransactionDate(t);
-                            return d ? d.toLocaleString('id-ID', {
-                              day: '2-digit',
-                              month: '2-digit',
-                              year: 'numeric',
-                              hour: '2-digit',
-                              minute: '2-digit'
-                            }) : '-';
+                            return d ? d.toLocaleTimeString([], { hour: '2-digit', minute:'2-digit' }) : '-';
                           })()}
                         </span>
                       </div>
                     </div>
-                    <div className="flex items-center space-x-2">
-                      <span className="text-xs text-gray-300 capitalize">{t.payment_method}</span>
-                      <PaymentBadge status={t.payment_status || (t.is_paid ? 'paid' : 'pending')} />
-                    </div>
+                    <span className="text-xs text-gray-400">
+                      {(() => {
+                        const d = resolveTransactionDate(t);
+                        return d ? d.toLocaleDateString('id-ID', { year: 'numeric', month: 'short', day: 'numeric' }) : '-';
+                      })()}
+                    </span>
                   </div>
                   <h3 className="font-bold text-lg mb-1">{t.customer_name}</h3>
                   <p className="text-gray-400 text-sm mb-3">{t.customer_phone}</p>
@@ -603,14 +686,110 @@ export default function Transaksi({ auth, transactions }) {
                       <span className="text-gray-400">Total:</span>
                       <span className="font-bold text-orange-400">{currencyIDR(t.total_amount)}</span>
                     </div>
+                    <div className="flex items-center justify-between pt-1">
+                      <div className="flex items-center space-x-2 text-xs">
+                        <MethodBadge method={t.payment_method} />
+                        <PaymentBadge status={t.payment_status || (t.is_paid ? 'paid' : 'pending')} />
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <button
+                          className="px-3 py-1 rounded bg-green-600 hover:bg-green-700 text-white text-xs"
+                          onClick={(e) => { e.stopPropagation(); confirmOrder(t); }}
+                        >
+                          Konfirmasi
+                        </button>
+                        {t?.payment_method === 'cash' && (
+                          <button
+                            className="px-3 py-1 rounded bg-red-600 hover:bg-red-700 text-white text-xs"
+                            onClick={(e) => { e.stopPropagation(); cancelOrder(t); }}
+                          >
+                            Batalkan
+                          </button>
+                        )}
+                      </div>
+                    </div>
                   </div>
-                  <div className="flex items-center justify-end space-x-2">
-                    
-                  </div>
+                  <div className="flex items-center justify-end space-x-2"></div>
                 </div>
               </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )
+        )}
+
+        {activeTab === 'history' && (
+          <>
+            <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow border border-gray-100 dark:border-gray-700">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="md:col-span-3">
+                  <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Cari (Kode/Antrian/Nama/HP/Metode/Status)</label>
+                  <input type="text" value={historySearch} onChange={(e)=>setHistorySearch(e.target.value)} placeholder="Ketik kata kunci..." className="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100" />
+                </div>
+              </div>
+            </div>
+
+            {/* Table for history */}
+            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-xl overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                  <thead className="bg-gray-50 dark:bg-gray-700/50">
+                    <tr>
+                      <th className="px-4 py-3 text-left text-xs font-bold text-gray-600 dark:text-gray-300 uppercase tracking-wider">Tanggal</th>
+                      <th className="px-4 py-3 text-left text-xs font-bold text-gray-600 dark:text-gray-300 uppercase tracking-wider">Kode/Antrian</th>
+                      <th className="px-4 py-3 text-left text-xs font-bold text-gray-600 dark:text-gray-300 uppercase tracking-wider">Customer</th>
+                      <th className="px-4 py-3 text-left text-xs font-bold text-gray-600 dark:text-gray-300 uppercase tracking-wider">Metode</th>
+                      <th className="px-4 py-3 text-left text-xs font-bold text-gray-600 dark:text-gray-300 uppercase tracking-wider">Status Bayar</th>
+                      <th className="px-4 py-3 text-left text-xs font-bold text-gray-600 dark:text-gray-300 uppercase tracking-wider">Status Order</th>
+                      <th className="px-4 py-3 text-right text-xs font-bold text-gray-600 dark:text-gray-300 uppercase tracking-wider">Items</th>
+                      <th className="px-4 py-3 text-right text-xs font-bold text-gray-600 dark:text-gray-300 uppercase tracking-wider">Total</th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700 text-gray-800 dark:text-gray-200">
+                    {historyVisibleRows.length === 0 ? (
+                      <tr>
+                        <td colSpan={8} className="px-4 py-8 text-center text-base text-gray-500 dark:text-gray-400">Belum ada riwayat transaksi untuk hari ini.</td>
+                      </tr>
+                    ) : (
+                      historyVisibleRows.map((t) => (
+                        <tr key={t.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition duration-100 cursor-pointer" onClick={() => openDetail(t)}>
+                          <td className="px-4 py-3 text-sm">{(() => { const d = resolveTransactionDate(t); return d ? d.toLocaleString('id-ID', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '-'; })()}</td>
+                          <td className="px-4 py-3 text-sm font-mono text-indigo-600 dark:text-indigo-400">{t.kode_transaksi || `#${t.queue_number}`}</td>
+                          <td className="px-4 py-3 text-sm">{t.customer_name}</td>
+                          <td className="px-4 py-3 text-sm"><MethodBadge method={t.payment_method} /></td>
+                          <td className="px-4 py-3 text-sm"><PaymentBadge status={t.payment_status} /></td>
+                          <td className="px-4 py-3 text-sm"><OrderStatusBadge status={t.status} /></td>
+                          <td className="px-4 py-3 text-sm text-right font-medium">{t.total_items}</td>
+                          <td className="px-4 py-3 text-sm text-right font-semibold">{currencyIDR(t.total_amount)}</td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+              {/* Pagination footer */}
+              <div className="p-4 bg-gray-50 dark:bg-gray-800/50 flex justify-between items-center border-t border-gray-200 dark:border-gray-700">
+                <span className="text-sm text-gray-600 dark:text-gray-400">
+                  Menampilkan <strong>{historyTotal === 0 ? 0 : historyStartIndex + 1}</strong> sampai <strong>{historyEndIndex}</strong> dari <strong>{historyTotal}</strong> hasil.
+                </span>
+                <div className="space-x-2 flex">
+                  <button
+                    disabled={historyPage <= 1}
+                    onClick={() => setHistoryPage(p => Math.max(1, p - 1))}
+                    className="px-4 py-2 rounded-lg bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-300 dark:hover:bg-gray-600 flex items-center transition"
+                  >
+                    Sebelumnya
+                  </button>
+                  <button
+                    disabled={historyPage >= historyTotalPages}
+                    onClick={() => setHistoryPage(p => Math.min(historyTotalPages, p + 1))}
+                    className="px-4 py-2 rounded-lg bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-300 dark:hover:bg-gray-600 flex items-center transition"
+                  >
+                    Berikutnya
+                  </button>
+                </div>
+              </div>
+            </div>
+          </>
         )}
 
         {/* Modal detail */}
@@ -652,12 +831,18 @@ export default function Transaksi({ auth, transactions }) {
                   </div>
                   <div className="text-sm">
                     <div className="text-gray-500 dark:text-gray-400">Pembayaran</div>
-                    <div className="font-medium capitalize">{selected.payment_method}</div>
-                    <div className="text-gray-500 dark:text-gray-400 mt-1">Status: {selected.payment_status}</div>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      <MethodBadge method={selected.payment_method} />
+                      <PaymentBadge status={selected.payment_status} />
+                    </div>
                   </div>
                   <div className="text-sm">
                     <div className="text-gray-500 dark:text-gray-400">Antrian</div>
                     <div className="font-medium">{selected.queue_number ?? '-'}</div>
+                  </div>
+                  <div className="text-sm">
+                    <div className="text-gray-500 dark:text-gray-400">Status Order</div>
+                    <div className="mt-0.5"><OrderStatusBadge status={selected.status} /></div>
                   </div>
                   <div className="text-sm sm:col-span-2">
                     <div className="text-gray-500 dark:text-gray-400">Catatan</div>
@@ -715,16 +900,8 @@ export default function Transaksi({ auth, transactions }) {
                   </div>
                 </div>
 
-                <div className="mt-4 flex justify-end space-x-2">
+                <div className="mt-4 flex justify-end">
                   <button onClick={closeDetail} className="px-4 py-2 rounded-md bg-gray-200 text-gray-800 hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-100 dark:hover:bg-gray-600 text-sm font-medium">Tutup</button>
-                  <button disabled={!selected} onClick={() => confirmOrder(selected)} className="inline-flex items-center px-4 py-2 rounded-md bg-green-600 hover:bg-green-700 text-white text-sm font-medium disabled:opacity-60">
-                    <CheckCircle className="w-4 h-4 mr-1" /> Konfirmasi
-                  </button>
-                  {selected?.payment_method==='cash' && (
-                    <button disabled={!selected} onClick={() => cancelOrder(selected)} className="inline-flex items-center px-4 py-2 rounded-md bg-red-600 hover:bg-red-700 text-white text-sm font-medium disabled:opacity-60">
-                      <XCircle className="w-4 h-4 mr-1" /> Batalkan
-                    </button>
-                  )}
                 </div>
               </div>
             )}

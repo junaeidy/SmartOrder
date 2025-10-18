@@ -6,6 +6,7 @@ use App\Models\Product;
 use App\Models\Transaction;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
+use Carbon\Carbon;
 
 class KasirTransactionController extends Controller
 {
@@ -40,8 +41,41 @@ class KasirTransactionController extends Controller
             ];
         })->withQueryString();
 
+        // History: completed and canceled, paginated with a different page name
+        $historyDate = Carbon::now()->toDateString();
+        $historyQ = Transaction::query()
+            ->whereIn('status', ['completed', 'canceled'])
+            ->whereDate('created_at', $historyDate)
+            ->orderBy('created_at', 'desc');
+
+        $history = $historyQ->get()->map(function ($t) {
+            return [
+                'id' => $t->id,
+                'date' => optional($t->created_at)->toDateTimeString(),
+                'created_at' => optional($t->created_at)->toDateTimeString(),
+                'updated_at' => optional($t->updated_at)->toDateTimeString(),
+                'paid_at' => optional($t->paid_at)->toDateTimeString(),
+                'kode_transaksi' => $t->kode_transaksi,
+                'customer_name' => $t->customer_name,
+                'customer_phone' => $t->customer_phone,
+                'customer_email' => $t->customer_email,
+                'customer_notes' => $t->customer_notes,
+                'queue_number' => $t->queue_number,
+                'payment_method' => $t->payment_method === 'midtrans' ? 'online' : $t->payment_method,
+                'payment_status' => $t->payment_status,
+                'status' => $t->status,
+                'total_amount' => $t->total_amount,
+                'total_items' => $t->total_items,
+                'items' => is_array($t->items) ? $t->items : [],
+                'amount_received' => $t->amount_received,
+                'change_amount' => $t->change_amount,
+                'is_paid' => in_array(strtolower((string)$t->payment_status), ['paid','settlement','capture']),
+            ];
+    });
+
         return Inertia::render('Kasir/Transaksi', [
             'transactions' => $transactions,
+            'history' => $history,
         ]);
     }
 
