@@ -19,6 +19,9 @@ class KasirTransactionController extends Controller
             return [
                 'id' => $t->id,
                 'date' => optional($t->created_at)->toDateTimeString(),
+                'created_at' => optional($t->created_at)->toDateTimeString(),
+                'updated_at' => optional($t->updated_at)->toDateTimeString(),
+                'paid_at' => optional($t->paid_at)->toDateTimeString(),
                 'kode_transaksi' => $t->kode_transaksi,
                 'customer_name' => $t->customer_name,
                 'customer_phone' => $t->customer_phone,
@@ -31,6 +34,8 @@ class KasirTransactionController extends Controller
                 'total_amount' => $t->total_amount,
                 'total_items' => $t->total_items,
                 'items' => is_array($t->items) ? $t->items : [],
+                'amount_received' => $t->amount_received,
+                'change_amount' => $t->change_amount,
                 'is_paid' => in_array(strtolower((string)$t->payment_status), ['paid','settlement','capture']),
             ];
         })->withQueryString();
@@ -49,6 +54,19 @@ class KasirTransactionController extends Controller
 
         // If payment method is cash, this is the moment to mark as paid
         if ($transaction->payment_method === 'cash') {
+            $request->validate([
+                'amount_received' => ['required','numeric','min:'.$transaction->total_amount],
+            ], [
+                'amount_received.required' => 'Nominal yang diterima wajib diisi.',
+                'amount_received.numeric' => 'Nominal yang diterima harus berupa angka.',
+                'amount_received.min' => 'Uang yang diterima kurang dari total pembayaran.',
+            ]);
+
+            $received = (float) $request->input('amount_received');
+            $change = max(0, $received - (float) $transaction->total_amount);
+
+            $transaction->amount_received = $received;
+            $transaction->change_amount = $change;
             $transaction->payment_status = 'paid';
             $transaction->paid_at = now();
         }

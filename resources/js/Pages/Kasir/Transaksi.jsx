@@ -83,6 +83,8 @@ export default function Transaksi({ auth, transactions }) {
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [processedOrder, setProcessedOrder] = useState(null);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [cashReceived, setCashReceived] = useState('');
+  const [cashError, setCashError] = useState('');
   const [printerConnected, setPrinterConnected] = useState(false);
   const [printerDevice, setPrinterDevice] = useState(null);
   const debounceRef = useRef(null);
@@ -220,8 +222,21 @@ export default function Transaksi({ auth, transactions }) {
 
       receipt.push(
         BOLD_ON + '------------------------\n' + BOLD_OFF,
-  `Total     : Rp ${formatPrice(order.total_amount)}\n`,
-        `Pembayaran: ${order.payment_method.toUpperCase()}\n`,
+        `Total     : Rp ${formatPrice(order.total_amount)}\n`,
+        `Pembayaran: ${order.payment_method.toUpperCase()}\n`
+      );
+
+      if (order.payment_method === 'cash') {
+        const receivedRaw = (order.amount_received != null ? order.amount_received : cashReceived);
+        const receivedNum = Number(receivedRaw || 0);
+        const changeNum = Math.max(0, receivedNum - Number(order.total_amount || 0));
+        receipt.push(
+          `Tunai     : Rp ${formatPrice(receivedNum)}\n`,
+          `Kembalian : Rp ${formatPrice(changeNum)}\n`
+        );
+      }
+
+      receipt.push(
         '\n',
         CENTER,
         'Terima Kasih\n',
@@ -299,6 +314,8 @@ export default function Transaksi({ auth, transactions }) {
     setActionTarget(t);
     setActionType('confirm');
     setShowConfirmModal(true);
+    setCashReceived('');
+    setCashError('');
   };
   const cancelOrder = (t) => {
     if (!t) return;
@@ -310,11 +327,36 @@ export default function Transaksi({ auth, transactions }) {
     if (!actionTarget || !actionType) return;
     setBusyId(actionTarget.id);
     const url = actionType === 'confirm' ? route('kasir.transaksi.confirm', actionTarget.id) : route('kasir.transaksi.cancel', actionTarget.id);
-    
-    putWithRetry(url, {}, 1, 3, () => {
-      setShowActionModal(false);
+    const payload = {};
+    if (actionType === 'confirm' && actionTarget?.payment_method === 'cash') {
+      const receivedNum = Number(String(cashReceived).replace(/[^\d.-]/g, ''));
+      const totalNum = Number(actionTarget.total_amount);
+      if (!isFinite(receivedNum) || receivedNum <= 0) {
+        setBusyId(null);
+        setCashError('Masukkan nominal yang valid.');
+        return;
+      }
+      if (receivedNum < totalNum) {
+        setBusyId(null);
+        setCashError('Uang yang diterima kurang dari total.');
+        return;
+      }
+      payload.amount_received = receivedNum;
+    }
+
+    putWithRetry(url, payload, 1, 3, () => {
+      setShowConfirmModal(false);
       if (actionType === 'confirm') {
-        setProcessedOrder(actionTarget);
+        const receivedNum = payload.amount_received ?? null;
+        const totalNum = Number(actionTarget.total_amount);
+        const enriched = {
+          ...actionTarget,
+          ...(receivedNum != null ? {
+            amount_received: receivedNum,
+            change_amount: Math.max(0, Number(receivedNum) - totalNum)
+          } : {})
+        };
+        setProcessedOrder(enriched);
         setShowSuccessModal(true);
       }
     });
@@ -736,6 +778,40 @@ export default function Transaksi({ auth, transactions }) {
                     <span className="text-gray-600 dark:text-gray-400">Pembayaran:</span>
                     <span className="font-medium capitalize">{actionTarget.payment_method}</span>
                   </div>
+                  {actionTarget?.payment_method === 'cash' && (
+                    <>
+                      <div className="pt-2">
+                        <label className="block text-sm text-gray-600 dark:text-gray-300 mb-1">Nominal Diterima</label>
+                        <input
+                          type="number"
+                          min="0"
+                          inputMode="decimal"
+                          value={cashReceived}
+                          onChange={(e) => {
+                            setCashReceived(e.target.value);
+                            setCashError('');
+                          }}
+                          className="w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 focus:border-indigo-500 focus:ring-indigo-500 text-sm px-3 py-2"
+                          placeholder="Masukkan nominal uang..."
+                        />
+                        {cashError && <p className="mt-1 text-xs text-red-500">{cashError}</p>}
+                      </div>
+                      {(() => {
+                        const receivedNum = Number(String(cashReceived).replace(/[^\d.-]/g, ''));
+                        const totalNum = Number(actionTarget.total_amount);
+                        const valid = isFinite(receivedNum) && receivedNum > 0;
+                        const change = valid ? Math.max(0, receivedNum - totalNum) : 0;
+                        return (
+                          <div className="flex justify-between mt-2">
+                            <span className="text-gray-600 dark:text-gray-400">Kembalian:</span>
+                            <span className={`font-semibold ${valid && receivedNum >= totalNum ? 'text-green-600' : 'text-gray-400'}`}>
+                              {currencyIDR(change)}
+                            </span>
+                          </div>
+                        );
+                      })()}
+                    </>
+                  )}
                 </div>
               </div>
             )}
@@ -743,10 +819,7 @@ export default function Transaksi({ auth, transactions }) {
           
           <div className="mt-6 flex flex-col sm:flex-row gap-3 justify-center">
             <button
-              onClick={() => {
-                setShowConfirmModal(false);
-                performAction();
-              }}
+              onClick={performAction}
               disabled={busyId === actionTarget?.id}
               className={`inline-flex justify-center items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white ${
                 actionType === 'confirm'
@@ -801,6 +874,18 @@ export default function Transaksi({ auth, transactions }) {
                   <span className="text-gray-600 dark:text-gray-400">Total:</span>
                   <span className="font-medium text-green-600">{currencyIDR(processedOrder?.total_amount)}</span>
                 </div>
+                {processedOrder?.payment_method === 'cash' && (
+                  <>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600 dark:text-gray-400">Tunai:</span>
+                      <span className="font-medium">{currencyIDR(processedOrder?.amount_received ?? cashReceived)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600 dark:text-gray-400">Kembalian:</span>
+                      <span className="font-medium">{currencyIDR((processedOrder?.change_amount) ?? (Number(cashReceived || 0) - Number(processedOrder?.total_amount || 0)))}</span>
+                    </div>
+                  </>
+                )}
                 <div className="flex justify-between">
                   <span className="text-gray-600 dark:text-gray-400">Pembayaran:</span>
                   <span className="font-medium capitalize">{processedOrder?.payment_method}</span>

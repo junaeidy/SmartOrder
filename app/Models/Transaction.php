@@ -17,6 +17,8 @@ class Transaction extends Model
         'customer_notes',
         'total_amount',
         'total_items',
+        'amount_received',
+        'change_amount',
         'payment_method',
         'payment_status',
         'midtrans_transaction_id',
@@ -34,5 +36,7 @@ class Transaction extends Model
         'items' => 'array',
         'paid_at' => 'datetime',
         'confirmation_email_sent_at' => 'datetime',
+        'amount_received' => 'decimal:2',
+        'change_amount' => 'decimal:2',
     ];
 }

@@ -288,8 +288,8 @@ export default function Reports({ filters, summary, transactions, pagination, au
 
                 {/* DETAIL MODAL */}
                 <Modal show={showDetail} onClose={closeDetail} maxWidth="2xl">
-                    <div className="p-4 sm:p-6">
-                        <div className="flex items-start justify-between mb-4">
+                    <div className="p-4 sm:p-6 max-h-[80vh] overflow-y-auto bg-white dark:bg-gray-900">
+                        <div className="flex items-start justify-between mb-4 sticky top-0 z-10 bg-white dark:bg-gray-900 pb-2">
                             <div>
                                 <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Detail Transaksi</h3>
                                 {selected?.kode_transaksi && (
@@ -351,7 +351,7 @@ export default function Reports({ filters, summary, transactions, pagination, au
                                                         selected.items.map((it, idx) => {
                                                             const name = it.nama || it.name || `Item ${idx+1}`;
                                                             const qty = Number(it.quantity || it.qty || 0);
-                                                            const price = Number(it.price || 0);
+                                                            const price = Number(it.harga || 0);
                                                             const subtotal = Number(it.subtotal != null ? it.subtotal : (qty * price));
                                                             return (
                                                                 <tr key={idx}>
