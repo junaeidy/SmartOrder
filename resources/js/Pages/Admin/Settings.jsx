@@ -210,7 +210,7 @@ export default function Settings({ auth, storeHours, storeSettings, discounts })
 
             <div className="py-6 sm:py-10">
                 <div className="max-w-7xl mx-auto sm:px-6 lg:px-8">
-                    <div className="bg-white dark:bg-gray-800 shadow-sm rounded-lg overflow-hidden">
+                    <div className="bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 shadow-sm rounded-lg overflow-hidden">
                         {/* Tabs */}
                         <div className="border-b border-gray-200 dark:border-gray-700">
                             <nav className="flex -mb-px">
@@ -261,7 +261,7 @@ export default function Settings({ auth, storeHours, storeSettings, discounts })
                             {/* Store Hours Tab */}
                             {activeTab === 'store-hours' && (
                                 <div>
-                                    <h3 className="text-lg font-semibold mb-4">Jam Operasional Toko</h3>
+                                    <h3 className="text-lg font-semibold mb-4 text-gray-900 dark:text-gray-100">Jam Operasional Toko</h3>
                                     <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">
                                         Atur jam buka dan tutup toko untuk setiap hari dalam seminggu.
                                     </p>
@@ -318,7 +318,7 @@ export default function Settings({ auth, storeHours, storeSettings, discounts })
                             {/* Store Settings Tab */}
                             {activeTab === 'store-settings' && (
                                 <div>
-                                    <h3 className="text-lg font-semibold mb-4">Pengaturan Toko</h3>
+                                    <h3 className="text-lg font-semibold mb-4 text-gray-900 dark:text-gray-100">Pengaturan Toko</h3>
                                     <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">
                                         Atur informasi dasar dan pengaturan operasional toko.
                                     </p>
@@ -421,7 +421,7 @@ export default function Settings({ auth, storeHours, storeSettings, discounts })
                             {/* Discounts Tab */}
                             {activeTab === 'discounts' && (
                                 <div className="max-w-4xl mx-auto">
-                                    <h3 className="text-lg font-semibold mb-4">Kelola Diskon</h3>
+                                    <h3 className="text-lg font-semibold mb-4 text-gray-900 dark:text-gray-100">Kelola Diskon</h3>
                                     
                                     {/* New Discount Form */}
                                     <div className="bg-gray-50 dark:bg-gray-900 p-4 rounded-lg mb-6">
@@ -565,33 +565,33 @@ export default function Settings({ auth, storeHours, storeSettings, discounts })
                                         
                                         {discounts && discounts.length > 0 ? (
                                             <div className="overflow-x-auto">
-                                                <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700 text-sm">
+                                                <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700 text-sm text-gray-900 dark:text-gray-100">
                                                     <thead className="bg-gray-50 dark:bg-gray-800">
                                                         <tr>
-                                                            <th scope="col" className="px-3 py-2 text-left text-[11px] font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider">
+                                                            <th scope="col" className="px-3 py-2 text-left text-[11px] font-semibold text-gray-700 dark:text-gray-100 uppercase tracking-wider">
                                                                 Nama
                                                             </th>
-                                                            <th scope="col" className="px-3 py-2 text-left text-[11px] font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider">
+                                                            <th scope="col" className="px-3 py-2 text-left text-[11px] font-semibold text-gray-700 dark:text-gray-100 uppercase tracking-wider">
                                                                 Kode
                                                             </th>
-                                                            <th scope="col" className="px-3 py-2 text-left text-[11px] font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider">
+                                                            <th scope="col" className="px-3 py-2 text-left text-[11px] font-semibold text-gray-700 dark:text-gray-100 uppercase tracking-wider">
                                                                 Persentase
                                                             </th>
-                                                            <th scope="col" className="px-3 py-2 text-left text-[11px] font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider">
+                                                            <th scope="col" className="px-3 py-2 text-left text-[11px] font-semibold text-gray-700 dark:text-gray-100 uppercase tracking-wider">
                                                                 Min. Pembelian
                                                             </th>
-                                                            <th scope="col" className="px-3 py-2 text-left text-[11px] font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider">
+                                                            <th scope="col" className="px-3 py-2 text-left text-[11px] font-semibold text-gray-700 dark:text-gray-100 uppercase tracking-wider">
                                                                 Periode
                                                             </th>
-                                                            <th scope="col" className="px-3 py-2 text-left text-[11px] font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider">
+                                                            <th scope="col" className="px-3 py-2 text-left text-[11px] font-semibold text-gray-700 dark:text-gray-100 uppercase tracking-wider">
                                                                 Status
                                                             </th>
-                                                            <th scope="col" className="px-3 py-2 text-right text-[11px] font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider">
+                                                            <th scope="col" className="px-3 py-2 text-right text-[11px] font-semibold text-gray-700 dark:text-gray-100 uppercase tracking-wider">
                                                                 Aksi
                                                             </th>
                                                         </tr>
                                                     </thead>
-                                                    <tbody className="bg-white divide-y divide-gray-200 dark:bg-gray-800 dark:divide-gray-700">
+                                                    <tbody className="bg-white divide-y divide-gray-200 dark:bg-gray-800 dark:divide-gray-700 text-gray-900 dark:text-gray-100">
                                                         {discounts.map((discount) => (
                                                             <tr key={discount.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
                                                                 {editDiscountId === discount.id ? (
@@ -748,7 +748,7 @@ export default function Settings({ auth, storeHours, storeSettings, discounts })
                                                                                     )}
                                                                                 </div>
                                                                             ) : (
-                                                                                <span className="text-gray-400 dark:text-gray-600 text-xs italic">Tidak ada kode</span>
+                                                                                <span className="text-gray-500 dark:text-gray-200 text-xs italic">Tidak ada kode</span>
                                                                             )}
                                                                         </td>
                                                                         <td className="px-3 py-2 whitespace-nowrap">

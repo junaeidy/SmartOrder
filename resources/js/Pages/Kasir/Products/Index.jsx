@@ -136,7 +136,7 @@ export default function Index({ products, filters }) {
       <Head title="Manajemen Produk" />
       <div className="p-4 sm:p-6 lg:p-8">
         <div className="flex justify-between items-center mb-6">
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white flex items-center">
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100 flex items-center">
             <Package className="w-7 h-7 mr-3 text-blue-600" />
             Daftar Produk
           </h1>
@@ -158,7 +158,7 @@ export default function Index({ products, filters }) {
 
         {isFormOpen && (
           <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-lg mb-8 border border-gray-200 dark:border-gray-700">
-            <h3 className="text-xl font-semibold mb-4 text-gray-800 dark:text-white border-b pb-2">
+            <h3 className="text-xl font-semibold mb-4 text-gray-800 dark:text-gray-100 border-b pb-2">
               {isEditing ? "Edit Produk" : "Input Produk Baru"}
             </h3>
             <form onSubmit={handleSubmit}>
@@ -281,7 +281,7 @@ export default function Index({ products, filters }) {
               placeholder="Cari produk..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="block w-full pl-10 pr-4 py-2 border rounded-lg shadow-sm dark:bg-gray-700 dark:text-white"
+              className="block w-full pl-10 pr-4 py-2 border rounded-lg shadow-sm bg-white text-gray-900 dark:bg-gray-700 dark:text-gray-100"
             />
           </div>
         </form>
@@ -291,16 +291,16 @@ export default function Index({ products, filters }) {
           <table className="min-w-full text-left">
             <thead className="bg-gray-100 dark:bg-gray-700">
               <tr>
-                <th className="p-4">No</th>
-                <th className="p-4">Nama</th>
-                <th className="p-4">Harga</th>
-                <th className="p-4">Stok</th>
-                <th className="p-4">Gambar</th>
-                <th className="p-4">Status</th>
-                <th className="p-4 text-center">Aksi</th>
+                <th className="p-4 text-gray-700 dark:text-gray-200">No</th>
+                <th className="p-4 text-gray-700 dark:text-gray-200">Nama</th>
+                <th className="p-4 text-gray-700 dark:text-gray-200">Harga</th>
+                <th className="p-4 text-gray-700 dark:text-gray-200">Stok</th>
+                <th className="p-4 text-gray-700 dark:text-gray-200">Gambar</th>
+                <th className="p-4 text-gray-700 dark:text-gray-200">Status</th>
+                <th className="p-4 text-center text-gray-700 dark:text-gray-200">Aksi</th>
               </tr>
             </thead>
-            <tbody>
+            <tbody className="text-gray-900 dark:text-gray-100">
               {products.data.length > 0 ? (
                 products.data.map((product, i) => (
                   <tr
@@ -327,7 +327,7 @@ export default function Index({ products, filters }) {
                           className="w-12 h-12 object-cover rounded-md"
                         />
                       ) : (
-                        <span className="text-gray-400 text-sm italic">
+                        <span className="text-gray-500 dark:text-gray-400 text-sm italic">
                           Tidak ada gambar
                         </span>
                       )}
@@ -368,7 +368,7 @@ export default function Index({ products, filters }) {
                 ))
               ) : (
                 <tr>
-                  <td colSpan="6" className="p-4 text-center text-gray-500">
+                  <td colSpan="6" className="p-4 text-center text-gray-500 dark:text-gray-400">
                     Tidak ada produk ditemukan.
                   </td>
                 </tr>

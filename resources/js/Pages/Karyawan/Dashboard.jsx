@@ -28,8 +28,8 @@ export default function Dashboard() {
                                     </div>
                                 </div>
                                 <div>
-                                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Order Management</h3>
-                                    <p className="text-gray-600 dark:text-gray-400">Process and manage customer orders</p>
+                                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Manajemen Pesanan</h3>
+                                    <p className="text-gray-600 dark:text-gray-400">Proses dan kelola pesanan pelanggan</p>
                                 </div>
                             </div>
                         </Link>

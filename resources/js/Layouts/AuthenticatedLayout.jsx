@@ -51,13 +51,13 @@ export default function AuthenticatedLayout({ header, children }) {
     }, [notificationsOpen]);
 
     return (
-        <div className="min-h-screen flex bg-gray-100 dark:bg-gray-900">
+    <div className="min-h-screen flex bg-gray-100 dark:bg-gray-900">
             {/* Sidebar kiri */}
             <Sidebar />
 
             {/* Bagian kanan (konten utama) */}
             <div className="flex-1 ml-64">
-                <nav className="border-b border-gray-100 bg-white dark:border-gray-700 dark:bg-gray-800">
+                <nav className="border-b border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800">
                     <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
                         <div className="flex h-16 justify-between items-center">
                             {/* Brand / Logo */}

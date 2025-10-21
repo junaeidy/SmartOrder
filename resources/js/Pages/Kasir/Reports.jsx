@@ -12,11 +12,11 @@ const currencyIDR = (n) => new Intl.NumberFormat('id-ID', { style: 'currency', c
 const getStatusBadge = (status) => {
     switch (status?.toLowerCase()) {
         case 'completed':
-            return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-800 dark:text-green-100">Completed</span>;
+            return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-800 dark:text-green-100">Selesai</span>;
         case 'waiting':
-            return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800 dark:bg-yellow-800 dark:text-yellow-100">Waiting</span>;
+            return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800 dark:bg-yellow-800 dark:text-yellow-100">Menunggu</span>;
         case 'canceled':
-            return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800 dark:bg-red-800 dark:text-red-100">Canceled</span>;
+            return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800 dark:bg-red-800 dark:text-red-100">Dibatalkan</span>;
         default:
             return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300 capitalize">{status || 'N/A'}</span>;
     }
@@ -25,9 +25,9 @@ const getStatusBadge = (status) => {
 const getPaymentMethodIcon = (method) => {
     switch (method?.toLowerCase()) {
         case 'cash':
-            return <span className="flex items-center text-green-600 dark:text-green-400 font-semibold">Cash</span>;
+            return <span className="flex items-center text-green-600 dark:text-green-400 font-semibold">Tunai</span>;
         case 'online':
-            return <span className="flex items-center text-blue-600 dark:text-blue-400 font-semibold"> Online</span>;
+            return <span className="flex items-center text-blue-600 dark:text-blue-400 font-semibold">Online</span>;
         default:
             return <span className="capitalize">{method}</span>;
     }
@@ -177,9 +177,9 @@ export default function Reports({ filters, summary, transactions, pagination, au
                             <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Status Order</label>
                             <select value={local.status} onChange={(e) => setLocal({ ...local, status: e.target.value })} className="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100">
                                 <option value="">Semua Status</option>
-                                <option value="waiting">Waiting</option>
-                                <option value="completed">Completed</option>
-                                <option value="canceled">Canceled</option>
+                                <option value="waiting">Menunggu</option>
+                                <option value="completed">Selesai</option>
+                                <option value="canceled">Dibatalkan</option>
                             </select>
                         </div>
                     </div>

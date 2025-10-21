@@ -20,9 +20,11 @@ Route::get('/checkout', [CheckoutController::class, 'checkout'])
     ->name('checkout');
     
 Route::post('/checkout/process', [CheckoutController::class, 'process'])
+    ->middleware('throttle:20,1')
     ->name('checkout.process');
 // Validate cart availability
 Route::post('/cart/validate', [CheckoutController::class, 'validateCart'])
+    ->middleware('throttle:60,1')
     ->name('cart.validate');
     
 Route::get('/thankyou/{transaction}', [CheckoutController::class, 'thankyou'])
@@ -55,25 +57,6 @@ Route::get('/admin/reset-queue', function() {
 
 Route::middleware(['auth', 'verified'])->group(function () {
 
-    Route::middleware(['role:admin'])->group(function () {
-        Route::get('/admin/dashboard', [DashboardController::class, 'admin'])->name('admin.dashboard');
-        // Reports (duplicated from kasir)
-        Route::get('/admin/reports', [App\Http\Controllers\ReportsController::class, 'adminIndex'])->name('admin.reports');
-        Route::get('/admin/reports/export/excel', [App\Http\Controllers\ReportsController::class, 'adminExportExcel'])->name('admin.reports.export.excel');
-        Route::get('/admin/reports/export/pdf', [App\Http\Controllers\ReportsController::class, 'adminExportPdf'])->name('admin.reports.export.pdf');
-        
-        // Settings
-        Route::get('/admin/settings', [App\Http\Controllers\Admin\SettingsController::class, 'index'])->name('admin.settings');
-        Route::post('/admin/settings/store-hours', [App\Http\Controllers\Admin\SettingsController::class, 'updateStoreHours'])->name('admin.settings.store-hours');
-        Route::post('/admin/settings/store-settings', [App\Http\Controllers\Admin\SettingsController::class, 'updateStoreSettings'])->name('admin.settings.store-settings');
-        
-        // Discounts
-        Route::post('/admin/discounts', [App\Http\Controllers\Admin\DiscountController::class, 'store'])->name('admin.discounts.store');
-        Route::put('/admin/discounts/{discount}', [App\Http\Controllers\Admin\DiscountController::class, 'update'])->name('admin.discounts.update');
-        Route::delete('/admin/discounts/{discount}', [App\Http\Controllers\Admin\DiscountController::class, 'destroy'])->name('admin.discounts.destroy');
-        Route::put('/admin/discounts/{discount}/toggle', [App\Http\Controllers\Admin\DiscountController::class, 'toggleActive'])->name('admin.discounts.toggle');
-    });
-
     Route::middleware(['role:kasir'])->group(function () {
         Route::get('/kasir/dashboard', [DashboardController::class, 'kasir'])->name('kasir.dashboard');
         Route::resource('kasir/products', ProductController::class)->name('products.index', 'products.store', 'products.update', 'products.destroy');
@@ -87,6 +70,17 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/kasir/transaksi', [App\Http\Controllers\KasirTransactionController::class, 'index'])->name('kasir.transaksi');
         Route::put('/kasir/transaksi/{transaction}/confirm', [App\Http\Controllers\KasirTransactionController::class, 'confirm'])->name('kasir.transaksi.confirm');
         Route::put('/kasir/transaksi/{transaction}/cancel', [App\Http\Controllers\KasirTransactionController::class, 'cancel'])->name('kasir.transaksi.cancel');
+
+        // Settings
+        Route::get('/kasir/settings', [App\Http\Controllers\Admin\SettingsController::class, 'index'])->name('admin.settings');
+        Route::post('/kasir/settings/store-hours', [App\Http\Controllers\Admin\SettingsController::class, 'updateStoreHours'])->name('admin.settings.store-hours');
+        Route::post('/kasir/settings/store-settings', [App\Http\Controllers\Admin\SettingsController::class, 'updateStoreSettings'])->name('admin.settings.store-settings');
+        
+        // Discounts
+        Route::post('/kasir/discounts', [App\Http\Controllers\Admin\DiscountController::class, 'store'])->name('admin.discounts.store');
+        Route::put('/kasir/discounts/{discount}', [App\Http\Controllers\Admin\DiscountController::class, 'update'])->name('admin.discounts.update');
+        Route::delete('/kasir/discounts/{discount}', [App\Http\Controllers\Admin\DiscountController::class, 'destroy'])->name('admin.discounts.destroy');
+        Route::put('/kasir/discounts/{discount}/toggle', [App\Http\Controllers\Admin\DiscountController::class, 'toggleActive'])->name('admin.discounts.toggle');
     });
 
     Route::middleware(['role:karyawan'])->group(function () {

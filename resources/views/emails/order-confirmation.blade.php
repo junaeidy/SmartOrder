@@ -111,6 +111,9 @@
             background-color: #f8f9fa;
             font-weight: 700;
         }
+        .summary-label { text-align: right; }
+        .summary-value { text-align: right; white-space: nowrap; }
+        .muted { color: #666; font-weight: 500; }
         
         .queue-number {
             text-align: center;
@@ -206,6 +209,14 @@
                         </tr>
                     </thead>
                     <tbody>
+                        @php
+                            $items = collect($transaction->items ?? []);
+                            $subtotal = $items->sum(function($it){ return (float)($it['subtotal'] ?? 0); });
+                            $discountAmount = (float)($transaction->discount_amount ?? 0);
+                            $taxAmount = (float)($transaction->tax_amount ?? 0);
+                            $preTaxAmount = max($subtotal - $discountAmount, 0);
+                            $taxPercent = $preTaxAmount > 0 ? round(($taxAmount / $preTaxAmount) * 100, 2) : null;
+                        @endphp
                         @foreach($transaction->items as $item)
                         <tr>
                             <td>{{ $item['nama'] }}</td>
@@ -214,11 +225,31 @@
                             <td>Rp {{ number_format($item['subtotal'], 0, ',', '.') }}</td>
                         </tr>
                         @endforeach
-                        <tr class="total-row">
-                            <td colspan="2">Total Items: {{ $transaction->total_items }}</td>
-                            <td colspan="2" align="right">Total: Rp {{ number_format($transaction->total_amount, 0, ',', '.') }}</td>
-                        </tr>
                     </tbody>
+                    <tfoot>
+                        <tr>
+                            <td colspan="3" class="summary-label muted">Total Items</td>
+                            <td class="summary-value">{{ $transaction->total_items }}</td>
+                        </tr>
+                        <tr>
+                            <td colspan="3" class="summary-label">Subtotal</td>
+                            <td class="summary-value">Rp {{ number_format($subtotal, 0, ',', '.') }}</td>
+                        </tr>
+                        @if($discountAmount > 0)
+                        <tr>
+                            <td colspan="3" class="summary-label">Diskon</td>
+                            <td class="summary-value">- Rp {{ number_format($discountAmount, 0, ',', '.') }}</td>
+                        </tr>
+                        @endif
+                        <tr>
+                            <td colspan="3" class="summary-label">Pajak{{ !is_null($taxPercent) ? ' ('.rtrim(rtrim(number_format($taxPercent, 2, ',', '.'), '0'), ',').'% )' : '' }}</td>
+                            <td class="summary-value">Rp {{ number_format($taxAmount, 0, ',', '.') }}</td>
+                        </tr>
+                        <tr class="total-row">
+                            <td colspan="3" class="summary-label">Total</td>
+                            <td class="summary-value">Rp {{ number_format($transaction->total_amount, 0, ',', '.') }}</td>
+                        </tr>
+                    </tfoot>
                 </table>
             </div>
             

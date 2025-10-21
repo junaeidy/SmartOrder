@@ -279,14 +279,19 @@ class CheckoutController extends Controller
         $now = Carbon::now();
         $today = $now->toDateString();
         
-        $counter = QueueCounter::where('date', $today)->first();
+        // Use row-level locking to avoid duplicate numbers under high concurrency
+        $counter = QueueCounter::where('date', $today)->lockForUpdate()->first();
         
         if (!$counter) {
+            // Create the counter row for today and lock it
             $counter = QueueCounter::create([
                 'date' => $today,
                 'last_number' => 0
             ]);
+            // Re-fetch with lock to ensure exclusive access before increment
+            $counter = QueueCounter::where('id', $counter->id)->lockForUpdate()->first();
             
+            // Cleanup old rows (best-effort)
             QueueCounter::where('date', '<', $today)->delete();
             
             $this->info('New queue counter created for ' . $today);
