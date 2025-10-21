@@ -7,11 +7,7 @@ use Inertia\Inertia;
 
 class DashboardController extends Controller
 {
-    public function owner()
-    {
-        return Inertia::render('Owner/Dashboard');
-    }
-
+    
     public function kasir()
     {
         $startOfToday = now()->startOfDay();
@@ -211,7 +207,7 @@ class DashboardController extends Controller
             'avgCompletionByDay' => $avgCompletionByDay,
         ];
 
-        return Inertia::render('Kasir/Dashboard', [
+        return Inertia::render('Admin/Dashboard', [
             'stats' => $stats,
             'charts' => $charts,
         ]);

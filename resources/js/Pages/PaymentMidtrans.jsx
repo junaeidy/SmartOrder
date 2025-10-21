@@ -38,36 +38,29 @@ export default function PaymentMidtrans({ transaction, snapToken, clientKey }) {
 
     const checkPaymentStatus = useCallback(async () => {
         try {
-            console.log('Checking payment status for transaction:', transaction?.kode_transaksi);
             const response = await fetch(`/api/payment/check-status/${transaction?.kode_transaksi}`);
 
             if (!response.ok) {
-                console.error('Error response from status check API:', response.status, response.statusText);
                 return;
             }
 
             const data = await response.json();
-            console.log('Payment status check response:', data);
 
             if (data.success) {
                 const ps = data.transaction.payment_status;
                 if (ps === 'paid' || ps === 'settlement' || ps === 'capture') {
-                    console.log('Payment confirmed as paid, redirecting to thank you page');
                     handlePaid();
                 } else {
-                    console.log('Payment status:', ps);
+                    
                 }
             } else {
-                console.warn('Payment status check was not successful:', data.message);
+                
             }
         } catch (error) {
-            console.error('Failed to check payment status:', error);
         }
     }, [transaction?.kode_transaksi, handlePaid]);
 
     useEffect(() => {
-        console.log('Payment details:', { transaction, snapToken, clientKey });
-
         // Countdown timer
         timerRef.current = setInterval(() => {
             setTimeLeft(prev => {
@@ -94,20 +87,16 @@ export default function PaymentMidtrans({ transaction, snapToken, clientKey }) {
                         handlePaid();
                     },
                     onPending: () => {
-                        console.log('Payment pending');
                         setPaymentStatus('pending');
                     },
                     onError: (result) => {
-                        console.error('Payment error:', result);
                         setPaymentStatus('error');
                     },
                     onClose: () => {
-                        console.log('Snap closed without finishing payment, verifying status...');
                         checkPaymentStatus();
                     },
                 });
             } catch (error) {
-                console.error('Error initializing Snap payment:', error);
                 setPaymentStatus('error');
             } finally {
                 setIsLoading(false);
@@ -115,7 +104,6 @@ export default function PaymentMidtrans({ transaction, snapToken, clientKey }) {
         };
 
         script.onerror = (error) => {
-            console.error('Failed to load Snap.js:', error);
             setIsLoading(false);
             setPaymentStatus('error');
         };
@@ -146,10 +134,8 @@ export default function PaymentMidtrans({ transaction, snapToken, clientKey }) {
 
     const handleTryAgain = () => {
         try {
-            console.log('Retrying payment with token:', snapToken);
             window.snap?.pay(snapToken);
         } catch (error) {
-            console.error('Error retrying payment:', error);
             setPaymentStatus('error');
         }
     };

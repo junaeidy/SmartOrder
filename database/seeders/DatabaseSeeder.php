@@ -17,10 +17,10 @@ class DatabaseSeeder extends Seeder
         // User::factory(10)->create();
 
         User::create([
-            'name' => 'Owner',
-            'email' => 'owner@food.com',
+            'name' => 'Admin',
+            'email' => 'admin@food.com',
             'password' => Hash::make('password'),
-            'role' => 'owner',
+            'role' => 'admin',
         ]);
 
         User::create([
@@ -35,6 +35,12 @@ class DatabaseSeeder extends Seeder
             'email' => 'karyawan@food.com',
             'password' => Hash::make('password'),
             'role' => 'karyawan',
+        ]);
+        
+        // Seed settings and discounts
+        $this->call([
+            SettingsSeeder::class,
+            DiscountsSeeder::class,
         ]);
     }
 }

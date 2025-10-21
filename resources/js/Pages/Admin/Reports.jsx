@@ -12,11 +12,11 @@ const currencyIDR = (n) => new Intl.NumberFormat('id-ID', { style: 'currency', c
 const getStatusBadge = (status) => {
     switch (status?.toLowerCase()) {
         case 'completed':
-            return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-800 dark:text-green-100">Selesai</span>;
+            return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-800 dark:text-green-100">Completed</span>;
         case 'waiting':
-            return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800 dark:bg-yellow-800 dark:text-yellow-100">Menunggu</span>;
+            return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800 dark:bg-yellow-800 dark:text-yellow-100">Waiting</span>;
         case 'canceled':
-            return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800 dark:bg-red-800 dark:text-red-100">Dibatalkan</span>;
+            return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800 dark:bg-red-800 dark:text-red-100">Canceled</span>;
         default:
             return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300 capitalize">{status || 'N/A'}</span>;
     }
@@ -25,9 +25,9 @@ const getStatusBadge = (status) => {
 const getPaymentMethodIcon = (method) => {
     switch (method?.toLowerCase()) {
         case 'cash':
-            return <span className="flex items-center text-green-600 dark:text-green-400 font-semibold">Tunai</span>;
+            return <span className="flex items-center text-green-600 dark:text-green-400 font-semibold">Cash</span>;
         case 'online':
-            return <span className="flex items-center text-blue-600 dark:text-blue-400 font-semibold">Online</span>;
+            return <span className="flex items-center text-blue-600 dark:text-blue-400 font-semibold"> Online</span>;
         default:
             return <span className="capitalize">{method}</span>;
     }
@@ -75,17 +75,17 @@ export default function Reports({ filters, summary, transactions, pagination, au
     }, [selected]);
 
     const apply = () => {
-        router.get(route('kasir.reports'), local, { preserveState: true, replace: true });
+        router.get(route('admin.reports'), local, { preserveState: true, replace: true });
     };
 
     const reset = () => {
         const cleared = { from: '', to: '', payment_method: '', status: '', search: '' };
         setLocal(cleared);
-        router.get(route('kasir.reports'), {}, { preserveState: false, replace: true });
+        router.get(route('admin.reports'), {}, { preserveState: false, replace: true });
     };
 
     const exportUrl = (type) => {
-        const base = type === 'excel' ? route('kasir.reports.export.excel') : route('kasir.reports.export.pdf');
+        const base = type === 'excel' ? route('admin.reports.export.excel') : route('admin.reports.export.pdf');
         const params = new URLSearchParams(local).toString();
         return `${base}?${params}`;
     };
@@ -177,9 +177,9 @@ export default function Reports({ filters, summary, transactions, pagination, au
                             <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Status Order</label>
                             <select value={local.status} onChange={(e) => setLocal({ ...local, status: e.target.value })} className="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100">
                                 <option value="">Semua Status</option>
-                                <option value="waiting">Menunggu</option>
-                                <option value="completed">Selesai</option>
-                                <option value="canceled">Dibatalkan</option>
+                                <option value="waiting">Waiting</option>
+                                <option value="completed">Completed</option>
+                                <option value="canceled">Canceled</option>
                             </select>
                         </div>
                     </div>
@@ -282,7 +282,7 @@ export default function Reports({ filters, summary, transactions, pagination, au
                             <div className="space-x-2 flex">
                                 <button 
                                     disabled={pagination.current_page <= 1} 
-                                    onClick={() => router.get(route('kasir.reports'), { ...filters, page: pagination.current_page - 1 }, { preserveState: true, replace: true })} 
+                                    onClick={() => router.get(route('admin.reports'), { ...filters, page: pagination.current_page - 1 }, { preserveState: true, replace: true })} 
                                     className="px-4 py-2 rounded-lg bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-300 dark:hover:bg-gray-600 flex items-center transition"
                                 >
                                     <ArrowLeft className="w-4 h-4 mr-1" />
@@ -290,7 +290,7 @@ export default function Reports({ filters, summary, transactions, pagination, au
                                 </button>
                                 <button 
                                     disabled={pagination.current_page >= pagination.last_page} 
-                                    onClick={() => router.get(route('kasir.reports'), { ...filters, page: pagination.current_page + 1 }, { preserveState: true, replace: true })} 
+                                    onClick={() => router.get(route('admin.reports'), { ...filters, page: pagination.current_page + 1 }, { preserveState: true, replace: true })} 
                                     className="px-4 py-2 rounded-lg bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-300 dark:hover:bg-gray-600 flex items-center transition"
                                 >
                                     Berikutnya

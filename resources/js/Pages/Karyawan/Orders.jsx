@@ -15,31 +15,78 @@ const Orders = ({ pendingOrders, completedOrders, auth }) => {
     const [currentPage, setCurrentPage] = useState(1);
     const [ordersPerPage] = useState(10);
     const audioRef = useRef(null);
+    const [audioPermissionGranted, setAudioPermissionGranted] = useState(false);
     
     useEffect(() => {
         const clockInterval = setInterval(() => {
             setCurrentTime(new Date());
         }, 1000);
         
-        const channel = window.Echo.channel('orders');
+    const channel = window.Echo.channel('orders');
         
+        // Listen for new orders
         channel.listen('NewOrderReceived', (e) => {
             setOrders(prev => {
                 const exists = prev.some(o => o.id === e.transaction.id);
                 return exists ? prev : [...prev, e.transaction];
             });
             
+            // Play sound for new orders
             const audio = new Audio('/sounds/notification.wav');
             audio.volume = 0.8;
             audio.play().catch(error => {
-                console.warn('Autoplay blocked. Will play after user interaction.');
             });
+        });
+
+        // Listen for status changes but don't play sound
+        channel.listen('OrderStatusChanged', (e) => {
+            if (e?.transaction) {
+                setOrders(prev => {
+                    // Remove order if it's moved to awaiting_confirmation
+                    if (e.transaction.status === 'awaiting_confirmation') {
+                        return prev.filter(o => o.id !== e.transaction.id);
+                    }
+                    // Update the order if status changed
+                    return prev.map(o => o.id === e.transaction.id ? e.transaction : o);
+                });
+            }
         });
             
         return () => {
             clearInterval(clockInterval);
             window.Echo.leave('orders');
         };
+    }, []);
+
+    // Check and request audio permission helpers
+    const requestAudioPermission = async () => {
+        try {
+            const tempAudio = new Audio('/sounds/notification.wav');
+            tempAudio.volume = 0;
+            await tempAudio.play();
+            tempAudio.pause();
+            tempAudio.currentTime = 0;
+            setAudioPermissionGranted(true);
+            
+        } catch (error) {
+            setAudioPermissionGranted(false);
+        }
+    };
+
+    useEffect(() => {
+        // Attempt silent play to detect permission on mount
+        (async () => {
+            try {
+                const a = new Audio('/sounds/notification.wav');
+                a.volume = 0;
+                await a.play();
+                a.pause();
+                a.currentTime = 0;
+                setAudioPermissionGranted(true);
+            } catch (e) {
+                setAudioPermissionGranted(false);
+            }
+        })();
     }, []);
     
     useEffect(() => {
@@ -192,7 +239,7 @@ const Orders = ({ pendingOrders, completedOrders, auth }) => {
                     {/* Header */}
                     <div className="bg-gray-700 px-6 py-4 flex items-center">
                         <AlertCircle className="text-orange-400 w-6 h-6 mr-3" />
-                        <h3 className="text-xl font-semibold text-white">Complete Order</h3>
+                        <h3 className="text-xl font-semibold text-white">Kirim ke Kasir</h3>
                     </div>
                     
                     {/* Body */}
@@ -200,7 +247,7 @@ const Orders = ({ pendingOrders, completedOrders, auth }) => {
                         <p className={`text-gray-300 mb-6 transition-all duration-500 ${
                             isOpen ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-4'
                         }`}>
-                            Are you sure you want to mark order #{order?.queue_number} for <span className="text-white font-medium">{order?.customer_name}</span> as completed?
+                            Apakah Anda ingin mengirim pesanan #{order?.queue_number} milik <span className="text-white font-medium">{order?.customer_name}</span> ke kasir untuk konfirmasi?
                         </p>
                         
                         {/* Order summary */}
@@ -208,7 +255,7 @@ const Orders = ({ pendingOrders, completedOrders, auth }) => {
                             isOpen ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-4'
                         }`}>
                             <div className="flex justify-between mb-2">
-                                <span className="text-gray-400">Items:</span>
+                                <span className="text-gray-400">Item:</span>
                                 <span className="text-white">{order?.total_items}</span>
                             </div>
                             <div className="flex justify-between">
@@ -236,7 +283,7 @@ const Orders = ({ pendingOrders, completedOrders, auth }) => {
                                 }`}
                             >
                                 <CheckCircle className="w-5 h-5 mr-2" />
-                                <span>{processing ? 'Processing...' : 'Complete Order'}</span>
+                                <span>{processing ? 'Memproses...' : 'Kirim ke Kasir'}</span>
                             </button>
                             <button 
                                 onClick={handleClose}
@@ -244,7 +291,7 @@ const Orders = ({ pendingOrders, completedOrders, auth }) => {
                                 disabled={processing}
                             >
                                 <XCircle className="w-5 h-5 mr-2" />
-                                <span>Cancel</span>
+                                <span>Batal</span>
                             </button>
                         </div>
                     </div>
@@ -259,7 +306,7 @@ const Orders = ({ pendingOrders, completedOrders, auth }) => {
             header={
                 <div className="flex flex-col md:flex-row justify-between items-center">
                     <h2 className="text-xl font-semibold leading-tight text-gray-800 dark:text-gray-200">
-                        Order Management
+                        Manajemen Pesanan
                     </h2>
                     <div className="flex items-center space-x-2 text-sm md:text-base">
                         <Clock className="h-5 w-5 text-orange-500 animate-pulse" />
@@ -271,14 +318,37 @@ const Orders = ({ pendingOrders, completedOrders, auth }) => {
                 </div>
             }
         >
-            <Head title="Karyawan Orders" />
+            <Head title="Pesanan Karyawan" />
             
+            {/* Audio permission banner */}
+            {!audioPermissionGranted && (
+                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+                    <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4">
+                        <div className="flex">
+                            <div className="flex-shrink-0">
+                                <svg className="h-5 w-5 text-yellow-400" viewBox="0 0 20 20" fill="currentColor">
+                                    <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                                </svg>
+                            </div>
+                            <div className="ml-3">
+                                <p className="text-sm text-yellow-700">
+                                    Notifikasi suara tidak aktif.
+                                    <button onClick={requestAudioPermission} className="ml-2 font-medium text-yellow-700 underline hover:text-yellow-600">
+                                        Aktifkan notifikasi
+                                    </button>
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* Confirmation Modal */}
             <ConfirmationModal 
                 isOpen={showConfirmModal} 
                 onClose={() => setShowConfirmModal(false)}
                 onConfirm={() => {
-                    handleProcessOrder(selectedOrder, 'completed');
+                    handleProcessOrder(selectedOrder, 'awaiting_confirmation');
                     setShowConfirmModal(false);
                 }}
                 order={selectedOrder}
@@ -305,7 +375,7 @@ const Orders = ({ pendingOrders, completedOrders, auth }) => {
                                         : 'border-transparent text-gray-400 hover:text-gray-300 hover:border-gray-400'
                                 }`}
                             >
-                                Pending Orders
+                                Pesanan Tertunda
                                 <span className="ml-2 bg-orange-500 px-2 py-0.5 rounded-full text-xs text-white">
                                     {orders.length}
                                 </span>
@@ -319,7 +389,7 @@ const Orders = ({ pendingOrders, completedOrders, auth }) => {
                                         : 'border-transparent text-gray-400 hover:text-gray-300 hover:border-gray-400'
                                 }`}
                             >
-                                Completed Today
+                                Pesanan Selesai
                                 <span className="ml-2 bg-green-600 px-2 py-0.5 rounded-full text-xs text-white">
                                     {completedOrders.length}
                                 </span>
@@ -330,29 +400,29 @@ const Orders = ({ pendingOrders, completedOrders, auth }) => {
                     {activeTab === 'pending' && (
                         <>
                             <div className="mb-2 flex justify-between items-center">
-                                <h2 className="text-xl font-semibold">Pending Orders</h2>
+                                <h2 className="text-xl font-semibold">Pesanan Tertunda</h2>
                                 <span className="bg-orange-500 px-3 py-1 rounded-full text-sm font-medium">
-                                    {orders.length} Pending
+                                    {orders.length} Antrian
                                 </span>
                             </div>
                             
                             <div className="mb-6 bg-blue-900/30 border border-blue-800 rounded-lg p-4 text-blue-200">
-                                <p>Click on any order card to mark it as completed. New orders will appear automatically with a sound notification.</p>
+                                <p>Klik kartu pesanan untuk mengirim ke kasir (menunggu konfirmasi). Pesanan baru akan muncul otomatis disertai suara notifikasi.</p>
                             </div>
                         </>
                     )}
                     
                     {activeTab === 'pending' && (
                         orders.length === 0 ? (
-                            <div className="bg-gray-800 rounded-lg shadow-md p-6 text-center">
-                                <p className="text-gray-400">No pending orders at the moment.</p>
+                            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 text-center">
+                                <p className="text-gray-600 dark:text-gray-400">Tidak ada pesanan tertunda saat ini.</p>
                             </div>
                         ) : (
                             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                                 {orders.map(order => (
                                     <div key={order.id}>
                                         <div 
-                                            className="bg-gray-800 rounded-lg shadow-md overflow-hidden border-l-4 border-orange-500 transition-all hover:shadow-lg cursor-pointer"
+                                            className="bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden border-l-4 border-orange-500 transition-all hover:shadow-lg cursor-pointer"
                                             onClick={() => {
                                                 setSelectedOrder(order);
                                                 setShowConfirmModal(true);
@@ -376,23 +446,23 @@ const Orders = ({ pendingOrders, completedOrders, auth }) => {
                                                 </span>
                                             </div>
                                             
-                                            <h3 className="font-bold text-lg mb-1">{order.customer_name}</h3>
-                                            <p className="text-gray-400 text-sm mb-3">{order.customer_phone}</p>
+                                            <h3 className="font-bold text-lg mb-1 text-gray-900 dark:text-white">{order.customer_name}</h3>
+                                            <p className="text-gray-600 dark:text-gray-400 text-sm mb-3">{order.customer_phone}</p>
                                             
                                             <div className="space-y-2 mb-4">
                                                 <div className="flex justify-between">
-                                                    <span className="text-gray-400">Items:</span>
-                                                    <span className="font-medium">{order.total_items}</span>
+                                                    <span className="text-gray-600 dark:text-gray-400">Item:</span>
+                                                    <span className="font-medium text-gray-900 dark:text-white">{order.total_items}</span>
                                                 </div>
                                                 <div className="flex justify-between">
-                                                    <span className="text-gray-400">Total:</span>
-                                                    <span className="font-bold text-orange-400">
+                                                    <span className="text-gray-600 dark:text-gray-400">Total:</span>
+                                                    <span className="font-bold text-orange-600 dark:text-orange-400">
                                                         {formatCurrency(order.total_amount)}
                                                     </span>
                                                 </div>
                                             </div>
                                             
-                                            <div className="text-sm text-gray-400 mb-3">
+                                            <div className="text-sm text-gray-600 dark:text-gray-400 mb-3">
                                                 <div className="max-h-24 overflow-y-auto pr-1">
                                                     {order.items.map((item, idx) => (
                                                         <div key={idx} className="truncate">
@@ -403,9 +473,9 @@ const Orders = ({ pendingOrders, completedOrders, auth }) => {
                                             </div>
                                             
                                             {order.customer_notes && (
-                                                <div className="bg-gray-700 p-2 rounded text-sm mt-2 border-l-2 border-orange-500">
-                                                    <p className="text-gray-300 text-xs mb-1">Notes:</p>
-                                                    <p className="text-gray-100">{order.customer_notes}</p>
+                                                <div className="bg-gray-100 dark:bg-gray-700 p-2 rounded text-sm mt-2 border-l-2 border-orange-500">
+                                                    <p className="text-gray-700 dark:text-gray-300 text-xs mb-1">Catatan:</p>
+                                                    <p className="text-gray-900 dark:text-gray-100">{order.customer_notes}</p>
                                                 </div>
                                             )}
                                         </div>
@@ -420,9 +490,9 @@ const Orders = ({ pendingOrders, completedOrders, auth }) => {
                         <>
                             <div className="mb-4 flex flex-col md:flex-row md:justify-between md:items-center space-y-4 md:space-y-0">
                                 <div className="flex items-center">
-                                    <h2 className="text-xl font-semibold">Completed Orders Today</h2>
+                                    <h2 className="text-xl font-semibold">Pesanan Selesai Hari Ini</h2>
                                     <span className="ml-3 bg-green-600 px-3 py-1 rounded-full text-sm font-medium">
-                                        {completedOrders.length} Completed
+                                        {completedOrders.length} Selesai
                                     </span>
                                 </div>
                                 
@@ -432,7 +502,7 @@ const Orders = ({ pendingOrders, completedOrders, auth }) => {
                                         type="text"
                                         value={searchQuery}
                                         onChange={(e) => setSearchQuery(e.target.value)}
-                                        placeholder="Search orders..."
+                                        placeholder="Cari pesanan..."
                                         className="w-full bg-gray-700 border border-gray-600 rounded-lg py-2 pl-4 pr-10 text-gray-200 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
                                     />
                                     <div className="absolute inset-y-0 right-0 flex items-center pr-3">
@@ -443,45 +513,45 @@ const Orders = ({ pendingOrders, completedOrders, auth }) => {
                                 </div>
                             </div>
                             
-                            <div className="bg-gray-800 overflow-hidden shadow-sm sm:rounded-lg">
+                            <div className="bg-white dark:bg-gray-800 overflow-hidden shadow-sm sm:rounded-lg">
                                 {filteredOrders.length === 0 ? (
                                     <div className="p-8 text-center">
                                         <CheckCircle className="mx-auto h-12 w-12 text-gray-400" />
-                                        <h3 className="mt-2 text-lg font-medium text-white">No completed orders found</h3>
-                                        <p className="mt-1 text-gray-400">
-                                            {searchQuery ? "Try a different search term" : "Completed orders will appear here"}
+                                        <h3 className="mt-2 text-lg font-medium text-gray-900 dark:text-white">Tidak ada pesanan selesai</h3>
+                                        <p className="mt-1 text-gray-600 dark:text-gray-400">
+                                            {searchQuery ? "Coba kata kunci lain" : "Pesanan yang selesai akan muncul di sini"}
                                         </p>
                                     </div>
                                 ) : (
                                     <div className="overflow-x-auto">
-                                        <table className="min-w-full divide-y divide-gray-700">
-                                            <thead className="bg-gray-700">
+                                        <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                                            <thead className="bg-gray-50 dark:bg-gray-700">
                                                 <tr>
-                                                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
-                                                        Order ID
+                                                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-600 dark:text-gray-300 uppercase tracking-wider">
+                                                        Kode Transaksi
                                                     </th>
-                                                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
-                                                        Queue #
+                                                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-600 dark:text-gray-300 uppercase tracking-wider">
+                                                        No. Antrian
                                                     </th>
-                                                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+                                                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-600 dark:text-gray-300 uppercase tracking-wider">
                                                         Customer
                                                     </th>
-                                                    <th scope="col" className="px-6 py-3 text-center text-xs font-medium text-gray-400 uppercase tracking-wider">
-                                                        Items
+                                                    <th scope="col" className="px-6 py-3 text-center text-xs font-medium text-gray-600 dark:text-gray-300 uppercase tracking-wider">
+                                                        Item
                                                     </th>
-                                                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
-                                                        Received
+                                                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-600 dark:text-gray-300 uppercase tracking-wider">
+                                                        Diterima
                                                     </th>
-                                                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
-                                                        Completed
+                                                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-600 dark:text-gray-300 uppercase tracking-wider">
+                                                        Selesai
                                                     </th>
                                                 </tr>
                                             </thead>
-                                            <tbody className="bg-gray-800 divide-y divide-gray-700">
+                                            <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                                                 {currentOrders.map((order) => (
-                                                    <tr key={order.id} className="transition-colors hover:bg-gray-700/50">
+                                                    <tr key={order.id} className="transition-colors hover:bg-gray-50 dark:hover:bg-gray-700/50">
                                                         <td className="px-6 py-4 whitespace-nowrap">
-                                                            <div className="text-sm font-medium text-white">{order.kode_transaksi}</div>
+                                                            <div className="text-sm font-medium text-gray-900 dark:text-white">{order.kode_transaksi}</div>
                                                         </td>
                                                         <td className="px-6 py-4 whitespace-nowrap">
                                                             <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
@@ -489,18 +559,18 @@ const Orders = ({ pendingOrders, completedOrders, auth }) => {
                                                             </span>
                                                         </td>
                                                         <td className="px-6 py-4 whitespace-nowrap">
-                                                            <div className="text-sm text-white">{order.customer_name}</div>
+                                                            <div className="text-sm text-gray-900 dark:text-white">{order.customer_name}</div>
                                                         </td>
                                                         <td className="px-6 py-4 whitespace-nowrap text-center">
-                                                            <div className="text-sm text-white">{order.total_items}</div>
+                                                            <div className="text-sm text-gray-900 dark:text-white">{order.total_items}</div>
                                                         </td>
                                                         <td className="px-6 py-4 whitespace-nowrap">
-                                                            <div className="text-sm text-gray-300">
+                                                            <div className="text-sm text-gray-600 dark:text-gray-300">
                                                                 {new Date(order.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
                                                             </div>
                                                         </td>
                                                         <td className="px-6 py-4 whitespace-nowrap">
-                                                            <div className="text-sm text-gray-300">
+                                                            <div className="text-sm text-gray-600 dark:text-gray-300">
                                                                 {new Date(order.updated_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
                                                                 <span className="block text-xs text-green-400 mt-1">
                                                                     ({calculateProcessTime(order.created_at, order.updated_at)})
@@ -514,15 +584,15 @@ const Orders = ({ pendingOrders, completedOrders, auth }) => {
                                         
                                         {/* Pagination */}
                                         {totalPages > 1 && (
-                                            <div className="px-4 py-3 bg-gray-700 border-t border-gray-600">
+                                            <div className="px-4 py-3 bg-gray-50 dark:bg-gray-700 border-t border-gray-200 dark:border-gray-600">
                                                 <div className="flex items-center justify-between">
                                                     <div className="hidden sm:block">
-                                                        <p className="text-sm text-gray-400">
-                                                            Showing <span className="font-medium text-white">{indexOfFirstOrder + 1}</span> to{" "}
-                                                            <span className="font-medium text-white">
+                                                        <p className="text-sm text-gray-600 dark:text-gray-400">
+                                                            Menampilkan <span className="font-medium text-gray-900 dark:text-white">{indexOfFirstOrder + 1}</span> hingga{" "}
+                                                            <span className="font-medium text-gray-900 dark:text-white">
                                                                 {Math.min(indexOfLastOrder, filteredOrders.length)}
                                                             </span>{" "}
-                                                            of <span className="font-medium text-white">{filteredOrders.length}</span> orders
+                                                            dari <span className="font-medium text-gray-900 dark:text-white">{filteredOrders.length}</span> pesanan
                                                         </p>
                                                     </div>
                                                     
@@ -532,11 +602,11 @@ const Orders = ({ pendingOrders, completedOrders, auth }) => {
                                                             disabled={currentPage === 1}
                                                             className={`relative inline-flex items-center px-4 py-2 text-sm font-medium rounded-md ${
                                                                 currentPage === 1
-                                                                ? 'bg-gray-800 text-gray-500 cursor-not-allowed'
-                                                                : 'bg-gray-800 text-white hover:bg-gray-600'
+                                                                ? 'bg-gray-200 dark:bg-gray-800 text-gray-500 cursor-not-allowed'
+                                                                : 'bg-white dark:bg-gray-800 text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-600'
                                                             } mr-2`}
                                                         >
-                                                            Previous
+                                                            Sebelumnya
                                                         </button>
                                                         
                                                         <div className="hidden md:flex">
@@ -547,7 +617,7 @@ const Orders = ({ pendingOrders, completedOrders, auth }) => {
                                                                     className={`relative inline-flex items-center px-4 py-2 text-sm font-medium ${
                                                                         currentPage === i + 1
                                                                         ? 'bg-orange-500 text-white'
-                                                                        : 'bg-gray-800 text-white hover:bg-gray-600'
+                                                                        : 'bg-white dark:bg-gray-800 text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-600'
                                                                     } ${i !== totalPages - 1 ? 'mr-2' : ''}`}
                                                                 >
                                                                     {i + 1}
@@ -556,8 +626,8 @@ const Orders = ({ pendingOrders, completedOrders, auth }) => {
                                                         </div>
                                                         
                                                         <div className="flex md:hidden items-center px-4">
-                                                            <span className="text-gray-400">
-                                                                Page {currentPage} of {totalPages}
+                                                            <span className="text-gray-600 dark:text-gray-400">
+                                                                Halaman {currentPage} dari {totalPages}
                                                             </span>
                                                         </div>
                                                         
@@ -566,11 +636,11 @@ const Orders = ({ pendingOrders, completedOrders, auth }) => {
                                                             disabled={currentPage === totalPages}
                                                             className={`relative inline-flex items-center px-4 py-2 text-sm font-medium rounded-md ${
                                                                 currentPage === totalPages
-                                                                ? 'bg-gray-800 text-gray-500 cursor-not-allowed'
-                                                                : 'bg-gray-800 text-white hover:bg-gray-600'
+                                                                ? 'bg-gray-200 dark:bg-gray-800 text-gray-500 cursor-not-allowed'
+                                                                : 'bg-white dark:bg-gray-800 text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-600'
                                                             }`}
                                                         >
-                                                            Next
+                                                            Berikutnya
                                                         </button>
                                                     </div>
                                                 </div>
