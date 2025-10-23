@@ -16,5 +16,10 @@ class Product extends Model
         'gambar',
         'closed',
     ];
+
+    protected $casts = [
+        'stok' => 'string',
+        'closed' => 'boolean',
+    ];
 }
 
