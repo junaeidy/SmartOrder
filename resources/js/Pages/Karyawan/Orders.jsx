@@ -233,34 +233,34 @@ const Orders = ({ pendingOrders, completedOrders, auth }) => {
                 ></div>
                 
                 {/* Modal with fade-in and scale animation */}
-                <div className={`relative z-10 bg-gray-800 rounded-xl shadow-xl max-w-md w-full mx-4 overflow-hidden transform transition-all duration-300 ${
+                <div className={`relative z-10 bg-white dark:bg-gray-800 rounded-xl shadow-xl max-w-md w-full mx-4 overflow-hidden transform transition-all duration-300 ${
                     isOpen ? 'opacity-100 scale-100' : 'opacity-0 scale-95'
                 }`}>
                     {/* Header */}
-                    <div className="bg-gray-700 px-6 py-4 flex items-center">
-                        <AlertCircle className="text-orange-400 w-6 h-6 mr-3" />
-                        <h3 className="text-xl font-semibold text-white">Kirim ke Kasir</h3>
+                    <div className="bg-gray-100 dark:bg-gray-700 px-6 py-4 flex items-center">
+                        <AlertCircle className="text-orange-500 dark:text-orange-400 w-6 h-6 mr-3" />
+                        <h3 className="text-xl font-semibold text-gray-800 dark:text-white">Kirim ke Kasir</h3>
                     </div>
                     
                     {/* Body */}
                     <div className="px-6 py-5">
-                        <p className={`text-gray-300 mb-6 transition-all duration-500 ${
+                        <p className={`text-gray-700 dark:text-gray-300 mb-6 transition-all duration-500 ${
                             isOpen ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-4'
                         }`}>
-                            Apakah Anda ingin mengirim pesanan #{order?.queue_number} milik <span className="text-white font-medium">{order?.customer_name}</span> ke kasir untuk konfirmasi?
+                            Apakah Anda ingin mengirim pesanan #{order?.queue_number} milik <span className="text-gray-900 dark:text-white font-medium">{order?.customer_name}</span> ke kasir untuk konfirmasi?
                         </p>
                         
                         {/* Order summary */}
-                        <div className={`bg-gray-700/50 rounded-lg p-4 mb-6 transition-all duration-500 delay-100 ${
+                        <div className={`bg-gray-100 dark:bg-gray-700/50 rounded-lg p-4 mb-6 transition-all duration-500 delay-100 ${
                             isOpen ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-4'
                         }`}>
                             <div className="flex justify-between mb-2">
-                                <span className="text-gray-400">Item:</span>
-                                <span className="text-white">{order?.total_items}</span>
+                                <span className="text-gray-600 dark:text-gray-400">Item:</span>
+                                <span className="text-gray-900 dark:text-white">{order?.total_items}</span>
                             </div>
                             <div className="flex justify-between">
-                                <span className="text-gray-400">Total:</span>
-                                <span className="text-orange-400 font-medium">{formatCurrency(order?.total_amount)}</span>
+                                <span className="text-gray-600 dark:text-gray-400">Total:</span>
+                                <span className="text-orange-500 dark:text-orange-400 font-medium">{formatCurrency(order?.total_amount)}</span>
                             </div>
                         </div>
                         
@@ -276,9 +276,9 @@ const Orders = ({ pendingOrders, completedOrders, auth }) => {
                                     }, 300);
                                 }}
                                 disabled={processing}
-                                className={`flex-1 py-3 rounded-lg font-medium flex items-center justify-center transition duration-200 ${
+                                className={`flex-1 py-3 rounded-lg font-medium flex items-center justify-center text-white transition duration-200 ${
                                     processing 
-                                        ? 'bg-gray-600 cursor-not-allowed' 
+                                        ? 'bg-gray-500 dark:bg-gray-600 cursor-not-allowed' 
                                         : 'bg-green-600 hover:bg-green-700'
                                 }`}
                             >
@@ -287,7 +287,7 @@ const Orders = ({ pendingOrders, completedOrders, auth }) => {
                             </button>
                             <button 
                                 onClick={handleClose}
-                                className="py-3 px-4 rounded-lg bg-gray-700 hover:bg-gray-600 flex items-center justify-center transition duration-200"
+                                className="py-3 px-4 rounded-lg text-gray-900 dark:text-white bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 flex items-center justify-center transition duration-200"
                                 disabled={processing}
                             >
                                 <XCircle className="w-5 h-5 mr-2" />

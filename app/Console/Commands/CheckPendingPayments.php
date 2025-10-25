@@ -46,11 +46,52 @@ class CheckPendingPayments extends Command
             ->where('created_at', '>=', Carbon::now()->subDay())
             ->get();
             
+        // Get transactions with waiting_for_payment status that are older than 15 minutes
+        $expiredPayments = Transaction::where('status', 'waiting_for_payment')
+            ->where('payment_method', 'midtrans')
+            ->where('created_at', '<=', Carbon::now()->subMinutes(15))
+            ->get();
+            
         $this->info('Found ' . $pendingTransactions->count() . ' pending payments');
+        $this->info('Found ' . $expiredPayments->count() . ' expired payments (>15 minutes)');
         
         $updated = 0;
         $expired = 0;
         $failures = 0;
+        
+        // Process expired payments first
+        foreach ($expiredPayments as $transaction) {
+            $this->info("Canceling expired payment for transaction {$transaction->kode_transaksi}...");
+            
+            try {
+                // Restore stock
+                if (!empty($transaction->items)) {
+                    foreach ($transaction->items as $item) {
+                        $product = \App\Models\Product::find($item['id']);
+                        if ($product) {
+                            $product->stok += $item['quantity'];
+                            $product->save();
+                            $this->info("Restored {$item['quantity']} stock for product {$product->nama}");
+                        }
+                    }
+                }
+                
+                // Update transaction status
+                $transaction->status = 'canceled';
+                $transaction->payment_status = 'expired';
+                $transaction->updated_at = Carbon::now();
+                $transaction->save();
+                
+                // Trigger event
+                event(new \App\Events\OrderStatusChanged($transaction));
+                
+                $expired++;
+                $this->info("Transaction {$transaction->kode_transaksi} marked as expired and canceled");
+            } catch (\Exception $e) {
+                $this->error("Error canceling transaction {$transaction->kode_transaksi}: {$e->getMessage()}");
+                $failures++;
+            }
+        }
         
         foreach ($pendingTransactions as $transaction) {
             $this->info("Checking payment for transaction {$transaction->kode_transaksi}...");

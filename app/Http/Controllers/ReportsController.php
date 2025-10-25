@@ -72,98 +72,6 @@ class ReportsController extends Controller
         ]);
     }
 
-    public function adminExportExcel(Request $request)
-    {
-        $q = $this->buildQuery($request);
-        $rows = $q->orderBy('created_at', 'desc')->get();
-
-        // If Spatie Simple Excel exists, use it to stream XLSX; otherwise fallback to CSV
-        if (class_exists(\Spatie\SimpleExcel\SimpleExcelWriter::class)) {
-            $filename = 'laporan_'.now()->format('Ymd_His').'.xlsx';
-            $path = storage_path('app/'.$filename);
-            $writer = \Spatie\SimpleExcel\SimpleExcelWriter::create($path);
-
-            $writer->addHeader(['Tanggal', 'Kode', 'Customer', 'Metode', 'Status Bayar', 'Status', 'Total', 'Items']);
-            foreach ($rows as $t) {
-                $writer->addRow([
-                    optional($t->created_at)->toDateTimeString(),
-                    $t->kode_transaksi,
-                    $t->customer_name,
-                    $t->payment_method === 'midtrans' ? 'online' : $t->payment_method,
-                    $t->payment_status,
-                    $t->status,
-                    $t->total_amount,
-                    $t->total_items,
-                ]);
-            }
-
-            $paidStatuses = ['paid','settlement','capture'];
-            $paidTotal = $rows->filter(function($r) use ($paidStatuses) { return in_array(strtolower((string)$r->payment_status), $paidStatuses); })->sum('total_amount');
-            $writer->addRow([
-                '', '', '', 'TOTAL', '', '', $paidTotal, $rows->sum('total_items')
-            ]);
-            $writer->close();
-
-            return response()->download($path)->deleteFileAfterSend(true);
-        }
-
-        // CSV fallback
-        $filename = 'laporan_'.now()->format('Ymd_His').'.csv';
-        $headers = [
-            'Content-Type' => 'text/csv',
-            'Content-Disposition' => 'attachment; filename="'.$filename.'"',
-        ];
-
-        $callback = function () use ($rows) {
-            $out = fopen('php://output', 'w');
-            fputcsv($out, ['Tanggal', 'Kode', 'Customer', 'Metode', 'Status Bayar', 'Status', 'Total', 'Items']);
-            foreach ($rows as $t) {
-                fputcsv($out, [
-                    optional($t->created_at)->toDateTimeString(),
-                    $t->kode_transaksi,
-                    $t->customer_name,
-                    $t->payment_method === 'midtrans' ? 'online' : $t->payment_method,
-                    $t->payment_status,
-                    $t->status,
-                    $t->total_amount,
-                    $t->total_items,
-                ]);
-            }
-            
-            $paidStatuses = ['paid','settlement','capture'];
-            $paidTotal = $rows->filter(function($r) use ($paidStatuses) { return in_array(strtolower((string)$r->payment_status), $paidStatuses); })->sum('total_amount');
-            fputcsv($out, ['', '', '', 'TOTAL', '', '', $paidTotal, $rows->sum('total_items')]);
-            fclose($out);
-        };
-
-        return Response::stream($callback, 200, $headers);
-    }
-
-    public function adminExportPdf(Request $request)
-    {
-        $q = $this->buildQuery($request);
-        $rows = $q->orderBy('created_at', 'desc')->get();
-
-        $data = [
-            'title' => 'Laporan Transaksi',
-            'generatedAt' => now()->toDateTimeString(),
-            'rows' => $rows,
-        ];
-
-        if (class_exists(\Dompdf\Dompdf::class)) {
-            $html = view('reports.pdf', $data)->render();
-            $dompdf = new \Dompdf\Dompdf();
-            $dompdf->loadHtml($html);
-            $dompdf->setPaper('A4', 'portrait');
-            $dompdf->render();
-            return response($dompdf->output(), 200, [
-                'Content-Type' => 'application/pdf',
-                'Content-Disposition' => 'attachment; filename="laporan_'.now()->format('Ymd_His').'.pdf"',
-            ]);
-        }
-
-        return view('reports.pdf', $data);
-    }
 
     protected function buildQuery(Request $request)
     {
@@ -265,17 +173,28 @@ class ReportsController extends Controller
 
     public function exportExcel(Request $request)
     {
-    $q = $this->buildQuery($request);
-    $rows = $q->orderBy('created_at', 'desc')->get();
+        $q = $this->buildQuery($request);
+        $rows = $q->orderBy('created_at', 'desc')->get();
 
-        // If Spatie Simple Excel exists, use it to stream XLSX; otherwise fallback to CSV
+        $paidStatuses = ['paid', 'settlement', 'capture'];
+        $invalidStatuses = ['canceled', 'cancelled', 'expired', 'expire', 'deny', 'failed', 'pending', 'waiting_for_payment'];
+        $formatRupiah = fn($value) => is_numeric($value) ? 'Rp ' . number_format($value, 0, ',', '.') : $value;
+
+        // === XLSX pakai Spatie SimpleExcel ===
         if (class_exists(\Spatie\SimpleExcel\SimpleExcelWriter::class)) {
             $filename = 'laporan_'.now()->format('Ymd_His').'.xlsx';
             $path = storage_path('app/'.$filename);
             $writer = \Spatie\SimpleExcel\SimpleExcelWriter::create($path);
 
             $writer->addHeader(['Tanggal', 'Kode', 'Customer', 'Metode', 'Status Bayar', 'Status', 'Total', 'Items']);
+
             foreach ($rows as $t) {
+                $isInvalid = in_array(strtolower((string)$t->status), $invalidStatuses)
+                            || !in_array(strtolower((string)$t->payment_status), $paidStatuses);
+
+                $total = $isInvalid ? '-' : $formatRupiah($t->total_amount);
+                $items = $isInvalid ? '-' : $t->total_items;
+
                 $writer->addRow([
                     optional($t->created_at)->toDateTimeString(),
                     $t->kode_transaksi,
@@ -283,32 +202,39 @@ class ReportsController extends Controller
                     $t->payment_method === 'midtrans' ? 'online' : $t->payment_method,
                     $t->payment_status,
                     $t->status,
-                    $t->total_amount,
-                    $t->total_items,
+                    $total,
+                    $items,
                 ]);
             }
 
-            $paidStatuses = ['paid','settlement','capture'];
-            $paidTotal = $rows->filter(function($r) use ($paidStatuses) { return in_array(strtolower((string)$r->payment_status), $paidStatuses); })->sum('total_amount');
-            $writer->addRow([
-                '', '', '', 'TOTAL', '', '', $paidTotal, $rows->sum('total_items')
-            ]);
+            // Hitung total hanya untuk yang paid
+            $paidTotal = $rows->filter(fn($r) => in_array(strtolower((string)$r->payment_status), $paidStatuses))
+                            ->sum('total_amount');
+
+            $writer->addRow(['', '', '', 'TOTAL', '', '', $formatRupiah($paidTotal), $rows->sum('total_items')]);
             $writer->close();
 
             return response()->download($path)->deleteFileAfterSend(true);
         }
 
-        // CSV fallback
+        // ==== CSV fallback ====
         $filename = 'laporan_'.now()->format('Ymd_His').'.csv';
         $headers = [
             'Content-Type' => 'text/csv',
             'Content-Disposition' => 'attachment; filename="'.$filename.'"',
         ];
 
-        $callback = function () use ($rows) {
+        $callback = function () use ($rows, $paidStatuses, $invalidStatuses, $formatRupiah) {
             $out = fopen('php://output', 'w');
             fputcsv($out, ['Tanggal', 'Kode', 'Customer', 'Metode', 'Status Bayar', 'Status', 'Total', 'Items']);
+
             foreach ($rows as $t) {
+                $isInvalid = in_array(strtolower((string)$t->status), $invalidStatuses)
+                            || !in_array(strtolower((string)$t->payment_status), $paidStatuses);
+
+                $total = $isInvalid ? '-' : $formatRupiah($t->total_amount);
+                $items = $isInvalid ? '-' : $t->total_items;
+
                 fputcsv($out, [
                     optional($t->created_at)->toDateTimeString(),
                     $t->kode_transaksi,
@@ -316,14 +242,15 @@ class ReportsController extends Controller
                     $t->payment_method === 'midtrans' ? 'online' : $t->payment_method,
                     $t->payment_status,
                     $t->status,
-                    $t->total_amount,
-                    $t->total_items,
+                    $total,
+                    $items,
                 ]);
             }
-            
-            $paidStatuses = ['paid','settlement','capture'];
-            $paidTotal = $rows->filter(function($r) use ($paidStatuses) { return in_array(strtolower((string)$r->payment_status), $paidStatuses); })->sum('total_amount');
-            fputcsv($out, ['', '', '', 'TOTAL', '', '', $paidTotal, $rows->sum('total_items')]);
+
+            $paidTotal = $rows->filter(fn($r) => in_array(strtolower((string)$r->payment_status), $paidStatuses))
+                            ->sum('total_amount');
+
+            fputcsv($out, ['', '', '', 'TOTAL', '', '', $formatRupiah($paidTotal), $rows->sum('total_items')]);
             fclose($out);
         };
 
@@ -333,12 +260,44 @@ class ReportsController extends Controller
     public function exportPdf(Request $request)
     {
         $q = $this->buildQuery($request);
-    $rows = $q->orderBy('created_at', 'desc')->get();
+        $rows = $q->orderBy('created_at', 'desc')->get();
+
+        $invalidStatuses = ['canceled', 'cancelled', 'expired', 'expire', 'deny', 'failed', 'pending', 'waiting_for_payment'];
+        $paidStatuses = ['paid', 'settlement', 'capture'];
+
+        $formatRupiah = fn($value) => is_numeric($value) ? 'Rp ' . number_format($value, 0, ',', '.') : $value;
+
+        // Filter baris yang valid untuk kalkulasi summary
+        $paidRows = $rows->filter(function ($t) use ($invalidStatuses, $paidStatuses) {
+            return !in_array(strtolower((string)$t->status), $invalidStatuses)
+                && in_array(strtolower((string)$t->payment_status), $paidStatuses);
+        });
+
+        $summary = [
+            'total_amount' => $paidRows->sum('total_amount'),
+            'total_items' => $paidRows->sum('total_items'),
+        ];
+
+        $mappedRows = $rows->map(function ($t) use ($invalidStatuses, $paidStatuses) {
+            $isInvalid = in_array(strtolower((string)$t->status), $invalidStatuses)
+                        || !in_array(strtolower((string)$t->payment_status), $paidStatuses);
+
+            $mappedRow = clone $t;
+
+            if ($isInvalid) {
+                $mappedRow->total_amount = 0;
+                $mappedRow->total_items = 0;
+            }
+
+            return $mappedRow;
+        });
 
         $data = [
             'title' => 'Laporan Transaksi',
             'generatedAt' => now()->toDateTimeString(),
-            'rows' => $rows,
+            'rows' => $mappedRows,
+            'summary' => $summary,
+            'formatRupiah' => $formatRupiah,
         ];
 
         if (class_exists(\Dompdf\Dompdf::class)) {

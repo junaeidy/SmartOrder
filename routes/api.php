@@ -8,6 +8,7 @@ use App\Http\Controllers\Api\V1\ProductController;
 use App\Http\Controllers\Api\V1\CheckoutController;
 use App\Http\Controllers\Api\V1\PaymentController;
 use App\Http\Controllers\Api\V1\DiscountController;
+use App\Http\Controllers\Api\V1\SettingController;
 
 /*
 |--------------------------------------------------------------------------
@@ -52,4 +53,7 @@ Route::prefix('v1')->group(function () {
     
     // Discount
     Route::post('/discount/verify', [DiscountController::class, 'verifyCode']);
+
+    // Settings
+    Route::get('/settings', [SettingController::class, 'getStoreSettings']);
 });

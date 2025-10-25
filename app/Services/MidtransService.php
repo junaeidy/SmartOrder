@@ -59,6 +59,20 @@ class MidtransService
                 'email' => $transaction->customer_email,
                 'phone' => $transaction->customer_phone,
             ],
+            // Enable payment method switching
+            'enabled_payments' => [
+                'credit_card', 'bca_va', 'bni_va', 'bri_va', 'permata_va',
+                'shopeepay', 'gopay', 'indomaret', 'alfamart', 'other_qris'
+            ],
+            // Set allow payment method switching to true
+            'callbacks' => [
+                'finish' => route('payment.finish', ['orderId' => $transaction->kode_transaksi]),
+            ],
+            // Add this to ensure payment method switching is allowed
+            'page_expiry' => [
+                'duration' => 15, // 15 minutes timeout
+                'unit' => 'minute'
+            ],
         ];
         
         // Save the Midtrans transaction ID to our transaction record
