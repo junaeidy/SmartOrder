@@ -15,7 +15,7 @@ const getStatusBadge = (status) => {
             return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-800 dark:text-green-100">Selesai</span>;
         case 'waiting':
             return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800 dark:bg-yellow-800 dark:text-yellow-100">Menunggu</span>;
-        case 'canceled':
+        case 'cancelled':
             return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800 dark:bg-red-800 dark:text-red-100">Dibatalkan</span>;
         default:
             return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300 capitalize">{status || 'N/A'}</span>;
@@ -179,7 +179,7 @@ export default function Reports({ filters, summary, transactions, pagination, au
                                 <option value="">Semua Status</option>
                                 <option value="waiting">Menunggu</option>
                                 <option value="completed">Selesai</option>
-                                <option value="canceled">Dibatalkan</option>
+                                <option value="cancelled">Dibatalkan</option>
                             </select>
                         </div>
                     </div>

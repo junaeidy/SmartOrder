@@ -95,7 +95,7 @@ class ReportsController extends Controller
             $q->where('payment_method', 'midtrans');
         }
 
-        // Status (waiting|completed|canceled)
+        // Status (waiting|completed|cancelled)
         if ($request->filled('status')) {
             $q->where('status', $request->query('status'));
         }

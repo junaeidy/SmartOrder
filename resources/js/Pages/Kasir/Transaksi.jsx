@@ -541,8 +541,8 @@ export default function Transaksi({ auth, transactions, history, storeSettings }
       }, 500);
     };
 
-    channel.listen('OrderStatusChanged', (e) => {
-      
+    channel.listen('.OrderStatusChanged', (e) => {
+      console.log('Order status changed:', e);
       const status = e?.status; // Status ada di root object, bukan di e.transaction
       // If a transaction entered awaiting_confirmation, play a sound
       const shouldSound = status === 'awaiting_confirmation';

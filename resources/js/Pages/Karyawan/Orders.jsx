@@ -25,21 +25,21 @@ const Orders = ({ pendingOrders, completedOrders, auth }) => {
     const channel = window.Echo.channel('orders');
         
         // Listen for new orders
-        channel.listen('NewOrderReceived', (e) => {
+        channel.listen('.NewOrderReceived', (e) => {
             setOrders(prev => {
                 const exists = prev.some(o => o.id === e.transaction.id);
                 return exists ? prev : [...prev, e.transaction];
             });
             
             // Play sound for new orders
-            const audio = new Audio('/sounds/notification.wav');
-            audio.volume = 0.8;
-            audio.play().catch(error => {
+                const audio = new Audio('/sounds/notification.wav');
+                audio.volume = 0.8;
+                audio.play().catch(error => {
             });
         });
 
         // Listen for status changes but don't play sound
-        channel.listen('OrderStatusChanged', (e) => {
+        channel.listen('.OrderStatusChanged', (e) => {
             if (e?.transaction) {
                 setOrders(prev => {
                     // Remove order if it's moved to awaiting_confirmation
@@ -503,7 +503,7 @@ const Orders = ({ pendingOrders, completedOrders, auth }) => {
                                         value={searchQuery}
                                         onChange={(e) => setSearchQuery(e.target.value)}
                                         placeholder="Cari pesanan..."
-                                        className="w-full bg-gray-700 border border-gray-600 rounded-lg py-2 pl-4 pr-10 text-gray-200 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                                        className="w-full bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm pl-10 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
                                     />
                                     <div className="absolute inset-y-0 right-0 flex items-center pr-3">
                                         <svg className="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">

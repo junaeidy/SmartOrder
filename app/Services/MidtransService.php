@@ -34,13 +34,46 @@ class MidtransService
     {
         $items = [];
 
+        // Normalize helper to integer rupiah (no decimals)
+        $toInt = function ($amount) {
+            // Amounts might be strings/decimals; ensure proper integer conversion
+            return (int) round((float) $amount, 0);
+        };
+
         // Parse the items from the transaction
+        $subtotal = 0;
         foreach ($transaction->items as $item) {
+            $unitPrice = $toInt($item['harga'] ?? ($item['price'] ?? 0));
+            $qty = (int) ($item['quantity'] ?? 0);
+            $name = $item['nama'] ?? ($item['name'] ?? 'Item');
             $items[] = [
-                'id' => $item['id'],
-                'price' => $item['harga'],
-                'quantity' => $item['quantity'],
-                'name' => $item['nama'],
+                'id' => (string) ($item['id'] ?? uniqid('ITM-')),
+                'price' => $unitPrice,
+                'quantity' => $qty,
+                'name' => $name,
+            ];
+            $subtotal += ($unitPrice * $qty);
+        }
+
+        // Add discount as a separate line (negative price) if any
+        $discountAmount = $toInt($transaction->discount_amount ?? 0);
+        if ($discountAmount > 0) {
+            $items[] = [
+                'id' => 'DISCOUNT',
+                'price' => -$discountAmount,
+                'quantity' => 1,
+                'name' => 'Diskon',
+            ];
+        }
+
+        // Add tax as a separate line if any
+        $taxAmount = $toInt($transaction->tax_amount ?? 0);
+        if ($taxAmount > 0) {
+            $items[] = [
+                'id' => 'TAX',
+                'price' => $taxAmount,
+                'quantity' => 1,
+                'name' => 'Pajak',
             ];
         }
 
@@ -48,10 +81,13 @@ class MidtransService
         // This will be the ID we use to check status with Midtrans API
         $midtransTransactionId = $transaction->kode_transaksi . '-' . uniqid();
 
+        // Compute gross amount explicitly to ensure it matches items sum
+        $grossAmount = $toInt($transaction->total_amount);
+
         $params = [
             'transaction_details' => [
                 'order_id' => $midtransTransactionId, // Use the unique Midtrans transaction ID
-                'gross_amount' => $transaction->total_amount,
+                'gross_amount' => $grossAmount,
             ],
             'item_details' => $items,
             'customer_details' => [
@@ -64,9 +100,11 @@ class MidtransService
                 'credit_card', 'bca_va', 'bni_va', 'bri_va', 'permata_va',
                 'shopeepay', 'gopay', 'indomaret', 'alfamart', 'other_qris'
             ],
-            // Set allow payment method switching to true
+            // Set callback URLs
             'callbacks' => [
-                'finish' => route('payment.finish', ['orderId' => $transaction->kode_transaksi]),
+                'finish' => route('midtrans.finish', ['orderId' => $transaction->kode_transaksi]),
+                'error' => route('midtrans.finish', ['orderId' => $transaction->kode_transaksi]),
+                'pending' => route('midtrans.finish', ['orderId' => $transaction->kode_transaksi]),
             ],
             // Add this to ensure payment method switching is allowed
             'page_expiry' => [
@@ -288,5 +326,65 @@ class MidtransService
             'success' => true,
             'transaction' => $transaction
         ];
+    }
+
+    /**
+     * Expire a pending Midtrans transaction (useful for VA/QR/retail payments)
+     *
+     * @param string $midtransOrderId The Midtrans order_id previously stored in midtrans_transaction_id
+     * @return array{success:bool,message?:string,response?:mixed}
+     */
+    public function expireTransaction(string $midtransOrderId): array
+    {
+        try {
+            $response = MidtransTransaction::expire($midtransOrderId);
+            \Illuminate\Support\Facades\Log::info('Midtrans expire success', [
+                'order_id' => $midtransOrderId,
+                'response' => $response,
+            ]);
+            return [
+                'success' => true,
+                'response' => $response,
+            ];
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::warning('Midtrans expire failed', [
+                'order_id' => $midtransOrderId,
+                'error' => $e->getMessage(),
+            ]);
+            return [
+                'success' => false,
+                'message' => $e->getMessage(),
+            ];
+        }
+    }
+
+    /**
+     * Cancel a Midtrans transaction (typically for credit card or specific cases)
+     *
+     * @param string $midtransOrderId
+     * @return array{success:bool,message?:string,response?:mixed}
+     */
+    public function cancelTransaction(string $midtransOrderId): array
+    {
+        try {
+            $response = MidtransTransaction::cancel($midtransOrderId);
+            \Illuminate\Support\Facades\Log::info('Midtrans cancel success', [
+                'order_id' => $midtransOrderId,
+                'response' => $response,
+            ]);
+            return [
+                'success' => true,
+                'response' => $response,
+            ];
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::warning('Midtrans cancel failed', [
+                'order_id' => $midtransOrderId,
+                'error' => $e->getMessage(),
+            ]);
+            return [
+                'success' => false,
+                'message' => $e->getMessage(),
+            ];
+        }
     }
 }

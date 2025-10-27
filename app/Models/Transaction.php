@@ -38,6 +38,7 @@ class Transaction extends Model
     protected $casts = [
         'items' => 'array',
         'paid_at' => 'datetime',
+        'cancelled_at' => 'datetime',
         'confirmation_email_sent_at' => 'datetime',
         'amount_received' => 'decimal:2',
         'change_amount' => 'decimal:2',
