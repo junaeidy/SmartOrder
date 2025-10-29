@@ -9,6 +9,9 @@ use App\Http\Controllers\Api\V1\CheckoutController;
 use App\Http\Controllers\Api\V1\PaymentController;
 use App\Http\Controllers\Api\V1\DiscountController;
 use App\Http\Controllers\Api\V1\SettingController;
+use App\Http\Controllers\Api\V1\ProductAnalyticsController;
+use App\Http\Controllers\Api\V1\MobilePasswordResetController;
+use App\Http\Controllers\FavoriteMenuController;
 
 /*
 |--------------------------------------------------------------------------
@@ -34,11 +37,14 @@ Route::prefix('v1')->group(function () {
     
     // Products
     Route::get('/products', [ProductController::class, 'index']);
+    Route::get('/products/{id}', [ProductController::class, 'show']);
     
     // Cart & Checkout
     Route::post('/cart/validate', [CheckoutController::class, 'validateCart']);
     Route::get('/checkout/data', [CheckoutController::class, 'checkoutData'])->middleware('auth:sanctum');
-    Route::post('/checkout/process', [CheckoutController::class, 'process'])->middleware('auth:sanctum');
+    Route::get('/checkout/idempotency-key', [CheckoutController::class, 'generateIdempotencyKey'])->middleware('auth:sanctum');
+    Route::post('/checkout/process', [CheckoutController::class, 'process'])
+        ->middleware(['auth:sanctum', 'checkout.rate.limit']);
     
     // Orders History
     Route::middleware('auth:sanctum')->group(function () {
@@ -53,6 +59,21 @@ Route::prefix('v1')->group(function () {
     
     // Discount
     Route::post('/discount/verify', [DiscountController::class, 'verifyCode']);
+
+    // Mobile Password Reset
+    Route::post('password/send-code', [MobilePasswordResetController::class, 'sendResetCode']);
+    Route::post('password/verify-and-reset', [MobilePasswordResetController::class, 'verifyCodeAndReset']);
+
+    // Favorite Menus
+    Route::middleware('auth:sanctum')->group(function () {
+        Route::get('/favorites', [FavoriteMenuController::class, 'index']);
+        Route::post('/favorites', [FavoriteMenuController::class, 'store']);
+        Route::delete('/favorites/{productId}', [FavoriteMenuController::class, 'destroy']);
+        Route::get('/favorites/check/{productId}', [FavoriteMenuController::class, 'checkFavorite']);
+    });
+
+    // Product Analytics
+    Route::get('/products/analytics/top', [ProductAnalyticsController::class, 'getTopProducts']);
 
     // Settings
     Route::get('/settings', [SettingController::class, 'getStoreSettings']);

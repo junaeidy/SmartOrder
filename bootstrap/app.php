@@ -43,6 +43,7 @@ return Application::configure(basePath: dirname(__DIR__))
 
         $middleware->alias([
             'role' => RoleMiddleware::class,
+            'checkout.rate.limit' => \App\Http\Middleware\CheckoutRateLimit::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {

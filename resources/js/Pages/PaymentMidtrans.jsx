@@ -85,7 +85,11 @@ export default function PaymentMidtrans({ transaction, snapToken, clientKey }) {
 
         // Load Midtrans Snap.js
         const script = document.createElement('script');
-        script.src = 'https://app.sandbox.midtrans.com/snap/snap.js';
+        // Auto-select environment based on clientKey prefix (SB- = Sandbox)
+        const isSandbox = typeof clientKey === 'string' && clientKey.startsWith('SB-');
+        script.src = isSandbox
+            ? 'https://app.sandbox.midtrans.com/snap/snap.js'
+            : 'https://app.midtrans.com/snap/snap.js';
         script.setAttribute('data-client-key', clientKey);
         document.body.appendChild(script);
 

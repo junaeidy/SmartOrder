@@ -6,7 +6,9 @@ use App\Http\Controllers\Controller;
 use App\Http\Resources\Api\V1\ProductResource;
 use App\Models\Product;
 use App\Models\Setting;
+use App\Models\FavoriteMenu;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 
 class ProductController extends Controller
 {
@@ -21,7 +23,17 @@ class ProductController extends Controller
         $isStoreOpen = $this->isStoreOpen();
         $storeHours = $this->getStoreHours();
         
-        $products = Product::all();
+        // Get customer to optimize favorite checking
+        $customer = Auth::guard('customer')->user();
+        
+        if ($customer) {
+            // Load products with customer's favorites to avoid N+1 queries
+            $products = Product::with(['favoriteMenus' => function($query) use ($customer) {
+                $query->where('customer_id', $customer->id);
+            }])->get();
+        } else {
+            $products = Product::all();
+        }
         
         return response()->json([
             'success' => true,
@@ -29,6 +41,31 @@ class ProductController extends Controller
                 'isStoreOpen' => $isStoreOpen,
                 'storeHours' => $storeHours,
                 'products' => ProductResource::collection($products)
+            ]
+        ]);
+    }
+
+    /**
+     * Get single product details.
+     *
+     * @param int $id
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function show($id)
+    {
+        $product = Product::find($id);
+        
+        if (!$product) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Product not found'
+            ], 404);
+        }
+        
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'product' => new ProductResource($product)
             ]
         ]);
     }

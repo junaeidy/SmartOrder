@@ -9,6 +9,7 @@ use App\Models\Product;
 use App\Models\QueueCounter;
 use App\Models\Transaction;
 use App\Services\MidtransService;
+use App\Services\DuplicateOrderProtectionService;
 use Carbon\Carbon;
 use App\Events\NewOrderReceived;
 use App\Events\ProductStockAlert;
@@ -21,10 +22,12 @@ use App\Mail\OrderConfirmation;
 class CheckoutController extends Controller
 {
     protected $midtransService;
+    protected $duplicateOrderService;
     
-    public function __construct(MidtransService $midtransService)
+    public function __construct(MidtransService $midtransService, DuplicateOrderProtectionService $duplicateOrderService)
     {
         $this->midtransService = $midtransService;
+        $this->duplicateOrderService = $duplicateOrderService;
     }
 
     /**
@@ -105,6 +108,26 @@ class CheckoutController extends Controller
             ]
         ]);
     }
+
+    /**
+     * Generate idempotency key for checkout protection
+     * 
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function generateIdempotencyKey(Request $request)
+    {
+        $customer = $request->user();
+        $idempotencyKey = $this->duplicateOrderService->generateIdempotencyKey($customer->email);
+        
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'idempotency_key' => $idempotencyKey,
+                'expires_at' => now()->addMinutes(30)->toISOString() // Key valid for 30 minutes
+            ]
+        ]);
+    }
     
     /**
      * Process checkout and create transaction
@@ -125,12 +148,59 @@ class CheckoutController extends Controller
         $customer = $request->user();
         $cartItems = $request->cartItems;
 
+        // 🔒 DUPLICATE ORDER PROTECTION - Step 1: Check Idempotency Key
+        $idempotencyKey = $request->header('X-Idempotency-Key');
+        if ($idempotencyKey) {
+            $existingTransaction = $this->duplicateOrderService->checkIdempotencyKey($idempotencyKey);
+            if ($existingTransaction) {
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Pesanan telah berhasil diproses sebelumnya.',
+                    'data' => [
+                        'transaction' => new OrderResource($existingTransaction),
+                        'is_duplicate' => true
+                    ]
+                ], 200);
+            }
+        } else {
+            // Generate idempotency key if not provided
+            $idempotencyKey = $this->duplicateOrderService->generateIdempotencyKey($customer->email);
+        }
+
+        // 🔒 DUPLICATE ORDER PROTECTION - Step 2: Generate and Check Order Hash
+        $orderData = [
+            'customer_email' => $customer->email,
+            'items' => $cartItems,
+            'payment_method' => $request->paymentMethod,
+            'customer_notes' => $request->orderNotes,
+            'discount_id' => $request->discountId,
+        ];
+        
+        $orderHash = $this->duplicateOrderService->generateOrderHash($orderData);
+        $duplicateCheck = $this->duplicateOrderService->checkDuplicateOrder($customer->email, $orderHash);
+        
+        if ($duplicateCheck['is_duplicate']) {
+            return response()->json([
+                'success' => false,
+                'message' => $duplicateCheck['message'],
+                'error_code' => 'DUPLICATE_ORDER',
+                'data' => [
+                    'reason' => $duplicateCheck['reason'],
+                    'existing_order' => $duplicateCheck['existing_order'] ?? null,
+                    'time_remaining' => $duplicateCheck['time_remaining'] ?? null
+                ]
+            ], 409); // 409 Conflict
+        }
+
+        // Record this attempt
+        $this->duplicateOrderService->recordAttempt($customer->email, $orderHash);
+
         $transaction = null;
         $midtransResponse = null;
         $paymentMethod = $request->paymentMethod;
 
         try {
-            $result = DB::transaction(function () use ($customer, $cartItems, $request, $paymentMethod, &$transaction, &$midtransResponse) {
+            $result = DB::transaction(function () use ($customer, $cartItems, $request, $paymentMethod, $orderHash, $idempotencyKey, &$transaction, &$midtransResponse) {
                 $totalAmount = 0;
                 $totalItems = 0;
                 $processedItems = [];
@@ -212,6 +282,9 @@ class CheckoutController extends Controller
                     'customer_email' => $customer->email,
                     'customer_phone' => $customer->phone,
                     'customer_notes' => $request->orderNotes ?? null,
+                    'order_hash' => $orderHash,
+                    'last_attempt_at' => Carbon::now(),
+                    'idempotency_key' => $idempotencyKey,
                     'total_amount' => $totalAmount,
                     'total_items' => $totalItems,
                     'discount_amount' => $discountAmount,
@@ -254,8 +327,9 @@ class CheckoutController extends Controller
 
         // After commit: midtrans flow or cash flow
         if ($paymentMethod === 'midtrans') {
-            return response()->json([
+            $response = response()->json([
                 'success' => true,
+                'message' => 'Transaksi berhasil dibuat',
                 'data' => [
                     'transaction' => new OrderResource($transaction),
                     'snapToken' => $midtransResponse['snap_token'],
@@ -263,23 +337,26 @@ class CheckoutController extends Controller
                     'redirectUrl' => $midtransResponse['redirect_url']
                 ]
             ]);
+        } else {
+            // Cash flow: send email + broadcast after commit
+            try {
+                Mail::to($transaction->customer_email)->send(new OrderConfirmation($transaction));
+            } catch (\Exception $e) {
+                Log::error('Error sending email: ' . $e->getMessage());
+            }
+            event(new NewOrderReceived($transaction));
+
+            $response = response()->json([
+                'success' => true,
+                'message' => 'Transaksi berhasil dibuat',
+                'data' => [
+                    'transaction' => new OrderResource($transaction)
+                ]
+            ]);
         }
 
-        // Cash flow: send email + broadcast after commit
-        try {
-            Mail::to($transaction->customer_email)->send(new OrderConfirmation($transaction));
-        } catch (\Exception $e) {
-            Log::error('Error sending email: ' . $e->getMessage());
-        }
-        event(new NewOrderReceived($transaction));
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Transaksi berhasil dibuat',
-            'data' => [
-                'transaction' => new OrderResource($transaction)
-            ]
-        ]);
+        // Add idempotency key to response headers for client reference
+        return $response->header('X-Idempotency-Key', $idempotencyKey);
     }
 
     /**

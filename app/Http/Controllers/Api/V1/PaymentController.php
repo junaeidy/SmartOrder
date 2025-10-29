@@ -55,9 +55,9 @@ class PaymentController extends Controller
             }
         }
 
-        $response = $this->midtransService->handleNotification($notification);
+    $response = $this->midtransService->handleNotification($notification);
         
-        if ($response["success"] && isset($response['transaction']) && $response['transaction']->payment_status == 'paid') {
+    if ($response["success"] && isset($response['transaction']) && $response['transaction']->payment_status == 'paid') {
             // If payment is successful, ensure status is 'waiting' and notify
             $transaction = $response['transaction'];
             $shouldNotify = empty($transaction->confirmation_email_sent_at);
@@ -84,6 +84,9 @@ class PaymentController extends Controller
             }
 
             Log::info('Ensured transaction status waiting and triggered event: ' . $transaction->kode_transaksi);
+        } elseif ($response["success"] && isset($response['transaction']) && $response['transaction']->payment_status == 'expired') {
+            // Handle expiration: cancel order, restock, email
+            $this->handleExpiredTransaction($response['transaction']);
         } else {
             Log::warning('Could not process Midtrans notification: ' . 
                 (isset($response['message']) ? $response['message'] : 'Unknown error'));
@@ -116,6 +119,31 @@ class PaymentController extends Controller
             
             // Get the transaction from response
             $transaction = $response['transaction'];
+
+            // If now paid, ensure finalize, broadcast and email (idempotent)
+            if ($transaction->payment_status === 'paid') {
+                $shouldNotify = empty($transaction->confirmation_email_sent_at);
+                if ($transaction->status !== 'waiting') {
+                    $transaction->status = 'waiting';
+                    $transaction->save();
+                }
+                if ($shouldNotify) {
+                    event(new \App\Events\NewOrderReceived($transaction));
+                    try {
+                        Mail::to($transaction->customer_email)->send(new OrderConfirmation($transaction));
+                        $transaction->confirmation_email_sent_at = now();
+                        $transaction->save();
+                        Log::info('[API] Order confirmation email sent via checkStatus for: ' . $transaction->kode_transaksi);
+                    } catch (\Exception $e) {
+                        Log::error('[API] Email error via checkStatus: ' . $e->getMessage());
+                    }
+                }
+            }
+
+            // If expired, finalize cancellation, restock, and notify customer
+            if ($transaction->payment_status === 'expired') {
+                $this->handleExpiredTransaction($transaction);
+            }
             
             return response()->json([
                 'success' => true,
@@ -145,5 +173,46 @@ class PaymentController extends Controller
             'success' => true,
             'message' => 'Payment process completed'
         ]);
+    }
+
+    /**
+     * Mark transaction as expired/cancelled, restock items, and send cancellation email.
+     * Idempotent: guarded by cancelled_at flag.
+     */
+    private function handleExpiredTransaction(Transaction $transaction): void
+    {
+        try {
+            if (!empty($transaction->cancelled_at)) {
+                // Already cancelled/processed
+                return;
+            }
+
+            $transaction->payment_status = 'expired';
+            $transaction->status = 'cancelled';
+            $transaction->cancelled_at = now();
+            $transaction->save();
+
+            // Restore product stock (items can be cast array or JSON string)
+            $items = is_array($transaction->items) ? $transaction->items : json_decode($transaction->items ?? '[]', true);
+            foreach ($items as $item) {
+                $product = \App\Models\Product::find($item['id'] ?? null);
+                if ($product && !empty($item['quantity'])) {
+                    $product->increment('stok', (int) $item['quantity']);
+                }
+            }
+
+            // Send cancellation email (best-effort)
+            try {
+                Mail::to($transaction->customer_email)
+                    ->send(new \App\Mail\OrderCancellation($transaction));
+                Log::info("[API] Cancellation email sent for transaction: {$transaction->kode_transaksi}");
+            } catch (\Throwable $e) {
+                Log::error("[API] Failed to send cancellation email for {$transaction->kode_transaksi}: " . $e->getMessage());
+            }
+
+            Log::info("[API] Transaction {$transaction->kode_transaksi} marked as expired and restocked");
+        } catch (\Throwable $e) {
+            Log::error('[API] handleExpiredTransaction error: ' . $e->getMessage());
+        }
     }
 }

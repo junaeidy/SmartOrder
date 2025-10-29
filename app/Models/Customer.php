@@ -49,4 +49,12 @@ class Customer extends Authenticatable
     {
         return $this->hasMany(Transaction::class, 'customer_email', 'email');
     }
+
+    /**
+     * Get the customer's favorite menus
+     */
+    public function favoriteMenus()
+    {
+        return $this->hasMany(FavoriteMenu::class);
+    }
 }

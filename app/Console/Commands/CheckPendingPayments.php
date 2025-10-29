@@ -105,30 +105,19 @@ class CheckPendingPayments extends Command
                     continue;
                 }
                 
-                $status = $response['status'];
-                $transactionStatus = $status->transaction_status ?? null;
+                // Service returns 'midtrans_status' (object/array) and updates DB transaction
+                $statusPayload = $response['midtrans_status'] ?? null;
+                $statusObj = is_array($statusPayload) ? (object) $statusPayload : $statusPayload;
+                $transactionStatus = $statusObj->transaction_status ?? null;
                 
                 $this->info("Transaction {$transaction->kode_transaksi} status: {$transactionStatus}");
                 
                 if (in_array($transactionStatus, ['settlement', 'capture'])) {
-                    // Payment successful
-                    $transaction->payment_status = 'paid';
-                    $transaction->paid_at = now();
-                    
-                    if ($transaction->status === 'waiting_for_payment') {
-                        $transaction->status = 'waiting';
-                    }
-                    
-                    $transaction->save();
+                    // Payment successful (should already be updated in service)
                     $updated++;
-                    
                     $this->info("Payment for transaction {$transaction->kode_transaksi} marked as paid");
                 } elseif (in_array($transactionStatus, ['expire', 'cancel', 'deny', 'failure'])) {
-                    // Payment failed or expired
-                    $transaction->payment_status = 'failed';
-                    $transaction->save();
                     $expired++;
-                    
                     $this->info("Payment for transaction {$transaction->kode_transaksi} marked as failed/expired");
                 }
                 
