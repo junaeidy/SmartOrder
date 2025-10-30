@@ -11,6 +11,7 @@ use App\Http\Controllers\Api\V1\DiscountController;
 use App\Http\Controllers\Api\V1\SettingController;
 use App\Http\Controllers\Api\V1\ProductAnalyticsController;
 use App\Http\Controllers\Api\V1\MobilePasswordResetController;
+use App\Http\Controllers\Api\V1\FcmTokenController;
 use App\Http\Controllers\FavoriteMenuController;
 
 /*
@@ -33,6 +34,10 @@ Route::prefix('v1')->group(function () {
     Route::middleware('auth:sanctum')->group(function () {
         Route::get('/profile', [ProfileController::class, 'show']);
         Route::put('/profile', [ProfileController::class, 'update']);
+        
+        // FCM Token Management
+        Route::post('/user/fcm-token', [FcmTokenController::class, 'store']);
+        Route::delete('/user/fcm-token/delete', [FcmTokenController::class, 'destroy']);
     });
     
     // Products

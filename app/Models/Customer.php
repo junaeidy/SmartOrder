@@ -21,6 +21,7 @@ class Customer extends Authenticatable
         'email',
         'phone',
         'password',
+        'fcm_token',
     ];
 
     /**

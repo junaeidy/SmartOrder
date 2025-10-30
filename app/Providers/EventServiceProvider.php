@@ -6,7 +6,9 @@ use Illuminate\Auth\Events\Registered;
 use Illuminate\Auth\Listeners\SendEmailVerificationNotification;
 use Illuminate\Foundation\Support\Providers\EventServiceProvider as ServiceProvider;
 use App\Events\NewOrderReceived;
+use App\Events\OrderStatusChanged;
 use App\Listeners\SendOrderConfirmationEmail;
+use App\Listeners\SendOrderStatusPushNotification;
 
 class EventServiceProvider extends ServiceProvider
 {
@@ -21,6 +23,9 @@ class EventServiceProvider extends ServiceProvider
         ],
         NewOrderReceived::class => [
             SendOrderConfirmationEmail::class,
+        ],
+        OrderStatusChanged::class => [
+            SendOrderStatusPushNotification::class,
         ],
     ];
 
