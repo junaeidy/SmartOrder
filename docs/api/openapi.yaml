@@ -1,0 +1,871 @@
+openapi: 3.0.0
+info:
+  title: SmartOrder Mobile API
+  description: API untuk aplikasi mobile pelanggan SmartOrder
+  version: 1.0.0
+servers:
+  - url: https://api.smartorder.com/v1
+    description: Production server
+  - url: http://localhost:8000/api/v1
+    description: Local development server
+
+tags:
+  - name: Authentication
+    description: Endpoint untuk register, login, dan logout
+  - name: Profile
+    description: Endpoint untuk manajemen profil pelanggan
+  - name: Products
+    description: Endpoint untuk mendapatkan produk
+  - name: Checkout
+    description: Endpoint untuk proses checkout dan riwayat pesanan
+  - name: Payment
+    description: Endpoint untuk pembayaran Midtrans
+  - name: Discount
+    description: Endpoint untuk validasi kode diskon
+
+paths:
+  /register:
+    post:
+      tags:
+        - Authentication
+      summary: Register pelanggan baru
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - name
+                - email
+                - password
+                - password_confirmation
+              properties:
+                name:
+                  type: string
+                  example: John Doe
+                email:
+                  type: string
+                  format: email
+                  example: john@example.com
+                phone:
+                  type: string
+                  example: "081234567890"
+                password:
+                  type: string
+                  format: password
+                  example: password123
+                password_confirmation:
+                  type: string
+                  format: password
+                  example: password123
+      responses:
+        '200':
+          description: Berhasil mendaftarkan pelanggan baru
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Registration successful
+                  data:
+                    type: object
+                    properties:
+                      token:
+                        type: string
+                        example: 2|laravel_sanctum_token_hash
+                      user:
+                        $ref: "#/components/schemas/Customer"
+        '422':
+          description: Validasi gagal
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ValidationError"
+
+  /login:
+    post:
+      tags:
+        - Authentication
+      summary: Login pelanggan
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+                - password
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: john@example.com
+                password:
+                  type: string
+                  format: password
+                  example: password123
+      responses:
+        '200':
+          description: Login berhasil
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Login successful
+                  data:
+                    type: object
+                    properties:
+                      token:
+                        type: string
+                        example: 2|laravel_sanctum_token_hash
+                      user:
+                        $ref: "#/components/schemas/Customer"
+        '401':
+          description: Kredensial tidak valid
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: false
+                  message:
+                    type: string
+                    example: Invalid credentials
+
+  /logout:
+    post:
+      tags:
+        - Authentication
+      summary: Logout pelanggan
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Logout berhasil
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Successfully logged out
+
+  /profile:
+    get:
+      tags:
+        - Profile
+      summary: Mendapatkan profil pelanggan
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Profil pelanggan
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    $ref: "#/components/schemas/Customer"
+    put:
+      tags:
+        - Profile
+      summary: Memperbarui profil pelanggan
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - name
+                - email
+              properties:
+                name:
+                  type: string
+                  example: John Doe
+                email:
+                  type: string
+                  format: email
+                  example: john@example.com
+                phone:
+                  type: string
+                  example: "081234567890"
+                password:
+                  type: string
+                  format: password
+                  example: new_password123
+                password_confirmation:
+                  type: string
+                  format: password
+                  example: new_password123
+      responses:
+        '200':
+          description: Profil berhasil diperbarui
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Profil berhasil diperbarui
+                  data:
+                    $ref: "#/components/schemas/Customer"
+        '422':
+          description: Validasi gagal
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ValidationError"
+
+  /products:
+    get:
+      tags:
+        - Products
+      summary: Mendapatkan daftar produk
+      responses:
+        '200':
+          description: Daftar produk
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      isStoreOpen:
+                        type: boolean
+                        example: true
+                      storeHours:
+                        type: object
+                        properties:
+                          monday:
+                            type: object
+                            properties:
+                              open:
+                                type: string
+                                example: "08:00"
+                              close:
+                                type: string
+                                example: "20:00"
+                      products:
+                        type: array
+                        items:
+                          $ref: "#/components/schemas/Product"
+
+  /cart/validate:
+    post:
+      tags:
+        - Checkout
+      summary: Validasi isi keranjang
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                cartItems:
+                  type: object
+                  additionalProperties:
+                    type: integer
+                  example:
+                    "1": 2
+                    "2": 1
+      responses:
+        '200':
+          description: Hasil validasi keranjang
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  issues:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        product_id:
+                          type: integer
+                          example: 1
+                        reason:
+                          type: string
+                          example: insufficient
+                        message:
+                          type: string
+                          example: Stok tidak mencukupi untuk jumlah yang diminta
+                        nama:
+                          type: string
+                          example: Nasi Goreng
+                        available:
+                          type: integer
+                          example: 10
+
+  /checkout/data:
+    get:
+      tags:
+        - Checkout
+      summary: Ambil data checkout
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Data checkout
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      taxPercentage:
+                        type: number
+                        example: 11
+                      isStoreOpen:
+                        type: boolean
+                        example: true
+
+  /checkout/process:
+    post:
+      tags:
+        - Checkout
+      summary: Proses pesanan pelanggan
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - cartItems
+                - paymentMethod
+              properties:
+                cartItems:
+                  type: object
+                  additionalProperties:
+                    type: integer
+                  example:
+                    "1": 2
+                    "2": 1
+                paymentMethod:
+                  type: string
+                  enum: [cash, midtrans]
+                  example: midtrans
+                orderNotes:
+                  type: string
+                  example: Tanpa cabe, extra keju
+                discountCode:
+                  type: string
+                  example: DISKON50
+      responses:
+        '200':
+          description: Transaksi berhasil dibuat
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Transaksi berhasil dibuat
+                  data:
+                    type: object
+                    properties:
+                      transaction:
+                        $ref: "#/components/schemas/Order"
+                      snapToken:
+                        type: string
+                        example: abc123def456
+                      clientKey:
+                        type: string
+                        example: SB-Mid-client-xxxxxxx
+                      redirectUrl:
+                        type: string
+                        example: https://app.midtrans.com/snap/v2/vtweb/abc123def456
+        '400':
+          description: Error validasi atau stok
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: false
+                  message:
+                    type: string
+                    example: Stok tidak mencukupi untuk produk Nasi Goreng
+
+  /orders/history:
+    get:
+      tags:
+        - Checkout
+      summary: Mendapatkan riwayat pesanan pelanggan
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Riwayat pesanan
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      transactions:
+                        type: array
+                        items:
+                          $ref: "#/components/schemas/Order"
+                      pagination:
+                        type: object
+                        properties:
+                          current_page:
+                            type: integer
+                            example: 1
+                          last_page:
+                            type: integer
+                            example: 3
+                          per_page:
+                            type: integer
+                            example: 10
+                          total:
+                            type: integer
+                            example: 25
+
+  /orders/{id}:
+    get:
+      tags:
+        - Checkout
+      summary: Detail pesanan tertentu
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+          description: ID transaksi
+          example: 1
+      responses:
+        '200':
+          description: Detail pesanan
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    $ref: "#/components/schemas/Order"
+        '403':
+          description: Tidak memiliki akses
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: false
+                  message:
+                    type: string
+                    example: Anda tidak memiliki akses ke transaksi ini
+
+  /payment/notification:
+    post:
+      tags:
+        - Payment
+      summary: Callback dari Midtrans
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                transaction_id:
+                  type: string
+                  example: "abc123"
+                order_id:
+                  type: string
+                  example: "TRX-20251022-ABCDE"
+                status_code:
+                  type: string
+                  example: "200"
+                status_message:
+                  type: string
+                  example: "Success, transaction is found"
+      responses:
+        '200':
+          description: Notification processed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: success
+
+  /payment/status/{orderId}:
+    get:
+      tags:
+        - Payment
+      summary: Cek status pembayaran
+      parameters:
+        - in: path
+          name: orderId
+          required: true
+          schema:
+            type: string
+          description: Order ID atau kode_transaksi
+          example: TRX-20251022-ABCDE
+      responses:
+        '200':
+          description: Status pembayaran
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      transaction:
+                        $ref: "#/components/schemas/Order"
+                      status:
+                        type: string
+                        example: paid
+                      midtrans_status:
+                        type: string
+                        example: settlement
+        '404':
+          description: Transaksi tidak ditemukan
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: false
+                  message:
+                    type: string
+                    example: Transaction not found in database
+
+  /payment/finish:
+    get:
+      tags:
+        - Payment
+      summary: Konfirmasi transaksi selesai
+      responses:
+        '200':
+          description: Process completed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Payment process completed
+
+  /discount/verify:
+    post:
+      tags:
+        - Discount
+      summary: Verifikasi kode diskon
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - code
+              properties:
+                code:
+                  type: string
+                  example: DISKON50
+                amount:
+                  type: number
+                  example: 100000
+      responses:
+        '200':
+          description: Kode diskon valid
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Kode diskon berhasil diterapkan
+                  discount:
+                    type: object
+                    properties:
+                      name:
+                        type: string
+                        example: Diskon 50%
+                      code:
+                        type: string
+                        example: DISKON50
+                      percentage:
+                        type: number
+                        example: 50
+                      amount:
+                        type: number
+                        example: 50000
+        '404':
+          description: Kode diskon tidak ditemukan
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: false
+                  message:
+                    type: string
+                    example: Kode diskon tidak ditemukan
+        '400':
+          description: Kode diskon tidak berlaku atau minimum tidak terpenuhi
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: false
+                  message:
+                    type: string
+                    example: Kode diskon sudah tidak berlaku
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    Customer:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        name:
+          type: string
+          example: John Doe
+        email:
+          type: string
+          example: john@example.com
+        phone:
+          type: string
+          example: "081234567890"
+        created_at:
+          type: string
+          format: date-time
+          example: "2025-10-22T10:30:00Z"
+        updated_at:
+          type: string
+          format: date-time
+          example: "2025-10-22T10:30:00Z"
+    Product:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        nama:
+          type: string
+          example: Nasi Goreng
+        harga:
+          type: number
+          example: 25000
+        stok:
+          type: integer
+          example: 50
+        closed:
+          type: boolean
+          example: false
+        gambar:
+          type: string
+          nullable: true
+          example: http://localhost:8000/storage/products/nasi_goreng.jpg
+        created_at:
+          type: string
+          format: date-time
+          example: "2025-10-15T08:00:00Z"
+        updated_at:
+          type: string
+          format: date-time
+          example: "2025-10-15T08:00:00Z"
+    Order:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        kode_transaksi:
+          type: string
+          example: TRX-20251022-ABCDE
+        customer_name:
+          type: string
+          example: John Doe
+        customer_email:
+          type: string
+          example: john@example.com
+        customer_phone:
+          type: string
+          example: "081234567890"
+        customer_notes:
+          type: string
+          nullable: true
+          example: Tanpa cabe, extra keju
+        total_amount:
+          type: number
+          example: 77500
+        total_items:
+          type: integer
+          example: 3
+        discount_amount:
+          type: number
+          example: 0
+        tax_amount:
+          type: number
+          example: 7500
+        payment_method:
+          type: string
+          example: midtrans
+        payment_status:
+          type: string
+          example: pending
+        midtrans_payment_url:
+          type: string
+          nullable: true
+          example: https://app.midtrans.com/snap/v2/vtweb/abc123def456
+        queue_number:
+          type: string
+          example: Q-20251022-001
+        status:
+          type: string
+          example: waiting_for_payment
+        items:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: integer
+                example: 1
+              nama:
+                type: string
+                example: Nasi Goreng
+              harga:
+                type: number
+                example: 25000
+              quantity:
+                type: integer
+                example: 2
+              subtotal:
+                type: number
+                example: 50000
+              gambar:
+                type: string
+                nullable: true
+                example: http://localhost:8000/storage/products/nasi_goreng.jpg
+        paid_at:
+          type: string
+          format: date-time
+          nullable: true
+          example: null
+        created_at:
+          type: string
+          format: date-time
+          example: "2025-10-22T11:15:00Z"
+        updated_at:
+          type: string
+          format: date-time
+          example: "2025-10-22T11:15:00Z"
+    ValidationError:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: false
+        message:
+          type: string
+          example: The given data was invalid.
+        errors:
+          type: object
+          properties:
+            email:
+              type: array
+              items:
+                type: string
+              example:
+                - The email has already been taken.

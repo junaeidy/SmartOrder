@@ -50,13 +50,16 @@ export default function PaymentMidtrans({ transaction, snapToken, clientKey }) {
                 const ps = data.transaction.payment_status;
                 if (ps === 'paid' || ps === 'settlement' || ps === 'capture') {
                     handlePaid();
-                } else {
-                    
+                } else if (ps === 'expired' || ps === 'cancelled') {
+                    setPaymentStatus('expired');
+                    cleanupTimers();
+                    setTimeLeft(0);
+                } else if (ps === 'pending') {
+                    setPaymentStatus('pending');
                 }
-            } else {
-                
             }
         } catch (error) {
+            console.error('Error checking payment status:', error);
         }
     }, [transaction?.kode_transaksi, handlePaid]);
 
@@ -67,6 +70,13 @@ export default function PaymentMidtrans({ transaction, snapToken, clientKey }) {
                 if (prev <= 1) {
                     if (timerRef.current) clearInterval(timerRef.current);
                     timerRef.current = null;
+                    // Redirect to checkout when timer expires
+                    router.visit('/checkout', {
+                        method: 'get',
+                        preserveState: false,
+                        preserveScroll: false,
+                        replace: true,
+                    });
                     return 0;
                 }
                 return prev - 1;
@@ -75,7 +85,11 @@ export default function PaymentMidtrans({ transaction, snapToken, clientKey }) {
 
         // Load Midtrans Snap.js
         const script = document.createElement('script');
-        script.src = 'https://app.sandbox.midtrans.com/snap/snap.js';
+        // Auto-select environment based on clientKey prefix (SB- = Sandbox)
+        const isSandbox = typeof clientKey === 'string' && clientKey.startsWith('SB-');
+        script.src = isSandbox
+            ? 'https://app.sandbox.midtrans.com/snap/snap.js'
+            : 'https://app.midtrans.com/snap/snap.js';
         script.setAttribute('data-client-key', clientKey);
         document.body.appendChild(script);
 

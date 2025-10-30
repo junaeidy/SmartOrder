@@ -13,9 +13,16 @@ class MidtransService
     {
         // Set Midtrans configuration
         Config::$serverKey = env('MIDTRANS_SERVER_KEY', config('midtrans.server_key'));
-        Config::$isProduction = env('MIDTRANS_IS_PRODUCTION', config('midtrans.is_production')) === 'true';
-        Config::$isSanitized = env('MIDTRANS_IS_SANITIZED', config('midtrans.is_sanitized')) === 'true';
-        Config::$is3ds = env('MIDTRANS_IS_3DS', config('midtrans.is_3ds')) === 'true';
+        // Robust boolean casting for env/config flags
+        $bool = function ($value, $default = false) {
+            if ($value === null) return (bool) $default;
+            // Accept bool, int, string forms: true/false, 1/0, 'true'/'false', 'yes'/'no', 'on'/'off'
+            if (is_bool($value)) return $value;
+            return filter_var($value, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE) ?? (bool) $default;
+        };
+        Config::$isProduction = $bool(env('MIDTRANS_IS_PRODUCTION', config('midtrans.is_production')));
+        Config::$isSanitized = $bool(env('MIDTRANS_IS_SANITIZED', config('midtrans.is_sanitized', true)));
+        Config::$is3ds = $bool(env('MIDTRANS_IS_3DS', config('midtrans.is_3ds', true)));
         
         // For debugging
         \Illuminate\Support\Facades\Log::info('Midtrans Config: ', [
@@ -34,13 +41,46 @@ class MidtransService
     {
         $items = [];
 
+        // Normalize helper to integer rupiah (no decimals)
+        $toInt = function ($amount) {
+            // Amounts might be strings/decimals; ensure proper integer conversion
+            return (int) round((float) $amount, 0);
+        };
+
         // Parse the items from the transaction
+        $subtotal = 0;
         foreach ($transaction->items as $item) {
+            $unitPrice = $toInt($item['harga'] ?? ($item['price'] ?? 0));
+            $qty = (int) ($item['quantity'] ?? 0);
+            $name = $item['nama'] ?? ($item['name'] ?? 'Item');
             $items[] = [
-                'id' => $item['id'],
-                'price' => $item['harga'],
-                'quantity' => $item['quantity'],
-                'name' => $item['nama'],
+                'id' => (string) ($item['id'] ?? uniqid('ITM-')),
+                'price' => $unitPrice,
+                'quantity' => $qty,
+                'name' => $name,
+            ];
+            $subtotal += ($unitPrice * $qty);
+        }
+
+        // Add discount as a separate line (negative price) if any
+        $discountAmount = $toInt($transaction->discount_amount ?? 0);
+        if ($discountAmount > 0) {
+            $items[] = [
+                'id' => 'DISCOUNT',
+                'price' => -$discountAmount,
+                'quantity' => 1,
+                'name' => 'Diskon',
+            ];
+        }
+
+        // Add tax as a separate line if any
+        $taxAmount = $toInt($transaction->tax_amount ?? 0);
+        if ($taxAmount > 0) {
+            $items[] = [
+                'id' => 'TAX',
+                'price' => $taxAmount,
+                'quantity' => 1,
+                'name' => 'Pajak',
             ];
         }
 
@@ -48,16 +88,35 @@ class MidtransService
         // This will be the ID we use to check status with Midtrans API
         $midtransTransactionId = $transaction->kode_transaksi . '-' . uniqid();
 
+        // Compute gross amount explicitly to ensure it matches items sum
+        $grossAmount = $toInt($transaction->total_amount);
+
         $params = [
             'transaction_details' => [
                 'order_id' => $midtransTransactionId, // Use the unique Midtrans transaction ID
-                'gross_amount' => $transaction->total_amount,
+                'gross_amount' => $grossAmount,
             ],
             'item_details' => $items,
             'customer_details' => [
                 'first_name' => $transaction->customer_name,
                 'email' => $transaction->customer_email,
                 'phone' => $transaction->customer_phone,
+            ],
+            // Enable payment method switching
+            'enabled_payments' => [
+                'credit_card', 'bca_va', 'bni_va', 'bri_va', 'permata_va',
+                'shopeepay', 'gopay', 'indomaret', 'alfamart', 'other_qris'
+            ],
+            // Set callback URLs
+            'callbacks' => [
+                'finish' => route('midtrans.finish', ['orderId' => $transaction->kode_transaksi]),
+                'error' => route('midtrans.finish', ['orderId' => $transaction->kode_transaksi]),
+                'pending' => route('midtrans.finish', ['orderId' => $transaction->kode_transaksi]),
+            ],
+            // Add this to ensure payment method switching is allowed
+            'page_expiry' => [
+                'duration' => 15, // 15 minutes timeout
+                'unit' => 'minute'
             ],
         ];
         
@@ -208,6 +267,29 @@ class MidtransService
         }
         
         \Illuminate\Support\Facades\Log::info('Received Midtrans notification: ', (array) $notification);
+
+        // Optional: Verify Midtrans signature when available
+        try {
+            if (isset($notification->signature_key, $notification->order_id, $notification->status_code, $notification->gross_amount)) {
+                $serverKey = Config::$serverKey;
+                $raw = $notification->order_id . $notification->status_code . $notification->gross_amount . $serverKey;
+                $computedSignature = hash('sha512', $raw);
+                if (!hash_equals($computedSignature, $notification->signature_key)) {
+                    \Illuminate\Support\Facades\Log::warning('Invalid Midtrans signature detected', [
+                        'order_id' => $notification->order_id,
+                    ]);
+                    return [
+                        'success' => false,
+                        'message' => 'Invalid Midtrans signature',
+                    ];
+                }
+            }
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('Midtrans signature verification error', [
+                'error' => $e->getMessage(),
+            ]);
+            // Proceed without blocking in case of unexpected format
+        }
         
         // Find transaction by the midtrans_transaction_id (not our kode_transaksi)
         $transaction = TransactionModel::where('midtrans_transaction_id', $notification->order_id)->first();
@@ -274,5 +356,65 @@ class MidtransService
             'success' => true,
             'transaction' => $transaction
         ];
+    }
+
+    /**
+     * Expire a pending Midtrans transaction (useful for VA/QR/retail payments)
+     *
+     * @param string $midtransOrderId The Midtrans order_id previously stored in midtrans_transaction_id
+     * @return array{success:bool,message?:string,response?:mixed}
+     */
+    public function expireTransaction(string $midtransOrderId): array
+    {
+        try {
+            $response = MidtransTransaction::expire($midtransOrderId);
+            \Illuminate\Support\Facades\Log::info('Midtrans expire success', [
+                'order_id' => $midtransOrderId,
+                'response' => $response,
+            ]);
+            return [
+                'success' => true,
+                'response' => $response,
+            ];
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::warning('Midtrans expire failed', [
+                'order_id' => $midtransOrderId,
+                'error' => $e->getMessage(),
+            ]);
+            return [
+                'success' => false,
+                'message' => $e->getMessage(),
+            ];
+        }
+    }
+
+    /**
+     * Cancel a Midtrans transaction (typically for credit card or specific cases)
+     *
+     * @param string $midtransOrderId
+     * @return array{success:bool,message?:string,response?:mixed}
+     */
+    public function cancelTransaction(string $midtransOrderId): array
+    {
+        try {
+            $response = MidtransTransaction::cancel($midtransOrderId);
+            \Illuminate\Support\Facades\Log::info('Midtrans cancel success', [
+                'order_id' => $midtransOrderId,
+                'response' => $response,
+            ]);
+            return [
+                'success' => true,
+                'response' => $response,
+            ];
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::warning('Midtrans cancel failed', [
+                'order_id' => $midtransOrderId,
+                'error' => $e->getMessage(),
+            ]);
+            return [
+                'success' => false,
+                'message' => $e->getMessage(),
+            ];
+        }
     }
 }

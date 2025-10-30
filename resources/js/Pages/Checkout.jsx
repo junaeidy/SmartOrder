@@ -331,7 +331,7 @@ const Checkout = ({ products, taxPercentage = 11 }) => {
                                                 setDiscountInfo(null);
                                             }}
                                             placeholder="Masukkan kode diskon"
-                                            className={`flex-1 bg-gray-700 text-white rounded-lg p-3 focus:outline-none ${
+                                            className={`flex-1 bg-white text-gray-900 rounded-lg p-3 focus:ring-2 focus:ring-orange-500 focus:outline-none dark:bg-gray-700 dark:text-white ${
                                                 discountError ? 'border border-red-500 focus:ring-2 focus:ring-red-500' :
                                                 discountSuccess ? 'border border-green-500 focus:ring-2 focus:ring-green-500' :
                                                 'focus:ring-2 focus:ring-orange-500'

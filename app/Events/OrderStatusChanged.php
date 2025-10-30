@@ -5,11 +5,11 @@ namespace App\Events;
 use App\Models\Transaction;
 use Illuminate\Broadcasting\Channel;
 use Illuminate\Broadcasting\InteractsWithSockets;
-use Illuminate\Contracts\Broadcasting\ShouldBroadcast;
+use Illuminate\Contracts\Broadcasting\ShouldBroadcastNow;
 use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\SerializesModels;
 
-class OrderStatusChanged implements ShouldBroadcast
+class OrderStatusChanged implements ShouldBroadcastNow
 {
     use Dispatchable, InteractsWithSockets, SerializesModels;
 
@@ -37,5 +37,13 @@ class OrderStatusChanged implements ShouldBroadcast
         return [
             new Channel('orders'),
         ];
+    }
+    
+    /**
+     * The event's broadcast name.
+     */
+    public function broadcastAs(): string
+    {
+        return 'OrderStatusChanged';
     }
 }

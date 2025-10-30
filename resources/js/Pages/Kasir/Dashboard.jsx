@@ -12,18 +12,18 @@ const StatCard = ({ title, value, icon: Icon, colorClass, description }) => (
     <div className={`bg-white dark:bg-gray-800 rounded-xl p-5 shadow-lg overflow-hidden border-l-4 ${colorClass}`}>
         <div className="flex items-start justify-between">
             <div>
-                <p className="text-sm font-medium text-gray-500 dark:text-gray-400">{title}</p>
+                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">{title}</p>
                 <p className={`mt-1 text-3xl font-extrabold ${colorClass.replace('-l-4', '').replace('border-', 'text-')}`}>
                     {value}
                 </p>
             </div>
             {Icon && (
-                <div className={`p-3 rounded-full ${colorClass.replace('border-', 'bg-').replace('-l-4', '-100 dark:bg-gray-700')}`}>
+                <div className={`p-3 rounded-full ${colorClass.replace('border-', 'bg-').replace('-l-4', '-100/50 dark:bg-gray-700')}`}>
                     <Icon className={`w-6 h-6 ${colorClass.replace('-l-4', '').replace('border-', 'text-')}`} />
                 </div>
             )}
         </div>
-        {description && <p className="mt-2 text-xs text-gray-400 dark:text-gray-500">{description}</p>}
+        {description && <p className="mt-2 text-xs text-gray-600 dark:text-gray-400">{description}</p>}
     </div>
 );
 

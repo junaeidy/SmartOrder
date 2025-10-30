@@ -19,6 +19,42 @@ class MidtransController extends Controller
     }
 
     /**
+     * Handle transaction expiration
+     */
+    private function handleExpiredTransaction(Transaction $transaction)
+    {
+        // Idempotent: if already cancelled, do nothing
+        if (!empty($transaction->cancelled_at)) {
+            return;
+        }
+
+        $transaction->payment_status = 'expired';
+        $transaction->status = 'cancelled';
+        $transaction->cancelled_at = now();
+        $transaction->save();
+
+        // Restore product stock (array cast or JSON)
+        $items = is_array($transaction->items) ? $transaction->items : json_decode($transaction->items ?? '[]', true);
+        foreach ($items as $item) {
+            $product = \App\Models\Product::find($item['id'] ?? null);
+            if ($product && !empty($item['quantity'])) {
+                $product->increment('stok', (int) $item['quantity']);
+            }
+        }
+
+        // Send cancellation email
+        try {
+            Mail::to($transaction->customer_email)
+                ->send(new \App\Mail\OrderCancellation($transaction));
+            Log::info("Cancellation email sent for transaction: {$transaction->kode_transaksi}");
+        } catch (\Exception $e) {
+            Log::error("Failed to send cancellation email for transaction {$transaction->kode_transaksi}: " . $e->getMessage());
+        }
+
+        Log::info("Transaction {$transaction->kode_transaksi} marked as expired");
+    }
+
+    /**
      * Handle notification from Midtrans
      */
     public function notification(Request $request)

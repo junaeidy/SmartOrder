@@ -37,7 +37,7 @@ Route::post('/midtrans/notification', [App\Http\Controllers\MidtransController::
 Route::get('/midtrans/status/{orderId}', [App\Http\Controllers\MidtransController::class, 'checkStatus'])
     ->name('midtrans.check-status');
     
-Route::get('/midtrans/finish', [App\Http\Controllers\MidtransController::class, 'finish'])
+Route::get('/midtrans/finish/{orderId?}', [App\Http\Controllers\MidtransController::class, 'finish'])
     ->name('midtrans.finish');
     
 // Discount Code Verification

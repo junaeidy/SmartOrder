@@ -541,8 +541,8 @@ export default function Transaksi({ auth, transactions, history, storeSettings }
       }, 500);
     };
 
-    channel.listen('OrderStatusChanged', (e) => {
-      
+    channel.listen('.OrderStatusChanged', (e) => {
+      console.log('Order status changed:', e);
       const status = e?.status; // Status ada di root object, bukan di e.transaction
       // If a transaction entered awaiting_confirmation, play a sound
       const shouldSound = status === 'awaiting_confirmation';
@@ -631,8 +631,8 @@ export default function Transaksi({ auth, transactions, history, storeSettings }
           <div className="flex items-center space-x-2 text-sm md:text-base">
             <ClockIcon className="h-5 w-5 text-orange-500 animate-pulse" />
             <div className="flex flex-col md:flex-row md:space-x-2">
-              <span className="font-mono text-gray-800 dark:text-gray-200">{formatTime(currentTime)}</span>
-              <span className="text-gray-600 dark:text-gray-400">{formatClockDate(currentTime)}</span>
+              <span className="font-mono text-gray-900 font-bold dark:text-gray-200">{formatTime(currentTime)}</span>
+              <span className="text-gray-700 dark:text-gray-400">{formatClockDate(currentTime)}</span>
             </div>
           </div>
         </div>
@@ -1037,7 +1037,7 @@ export default function Transaksi({ auth, transactions, history, storeSettings }
                     <span className="text-gray-600 dark:text-gray-400">Pembayaran:</span>
                     <span className="font-medium capitalize">{actionTarget.payment_method}</span>
                   </div>
-                  {actionTarget?.payment_method === 'cash' && (
+                  {actionTarget?.payment_method === 'cash' && actionType === 'confirm' && (
                     <>
                       <div className="pt-2">
                         <label className="block text-sm text-gray-600 dark:text-gray-300 mb-1">Nominal Diterima</label>
