@@ -57,4 +57,12 @@ class Transaction extends Model
     {
         return $this->belongsTo(Discount::class);
     }
+
+    /**
+     * Get the customer associated with this transaction
+     */
+    public function customer()
+    {
+        return $this->belongsTo(Customer::class, 'customer_email', 'email');
+    }
 }

@@ -103,6 +103,15 @@ API ini menggunakan versioning untuk memastikan kompatibilitas di masa depan. Se
 |--------|----------|--------|
 | POST | `/api/v1/discount/verify` | Verifikasi kode diskon |
 
+#### Push Notification (FCM)
+
+| Method | Endpoint | Fungsi |
+|--------|----------|--------|
+| POST | `/api/v1/user/fcm-token` | Simpan/update FCM token |
+| DELETE | `/api/v1/user/fcm-token/delete` | Hapus FCM token |
+
+> **📱 Push Notification**: Lihat [QUICKSTART_PUSH_NOTIFICATION.md](QUICKSTART_PUSH_NOTIFICATION.md) untuk setup
+
 ## Testing
 
 Untuk menjalankan test API:
@@ -115,6 +124,10 @@ php artisan test
 
 - [OpenAPI Documentation](docs/api/openapi.yaml)
 - [Postman Collection](docs/api/postman_collection.json)
+- **[🔔 Push Notification Setup](QUICKSTART_PUSH_NOTIFICATION.md)** - Quick start guide
+- [Push Notification Implementation](PUSH_NOTIFICATION_IMPLEMENTATION.md) - Complete implementation details
+- [Backend Push Notification Setup](BACKEND_PUSH_NOTIFICATION_SETUP.md) - Detailed backend setup
+- [Push Notification Guide (Flutter)](PUSH_NOTIFICATION_GUIDE.md) - Flutter/Mobile integration
 
 ## Flow Pembayaran dengan Midtrans
 
