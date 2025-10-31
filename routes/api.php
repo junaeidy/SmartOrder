@@ -12,6 +12,7 @@ use App\Http\Controllers\Api\V1\SettingController;
 use App\Http\Controllers\Api\V1\ProductAnalyticsController;
 use App\Http\Controllers\Api\V1\MobilePasswordResetController;
 use App\Http\Controllers\Api\V1\FcmTokenController;
+use App\Http\Controllers\Api\V1\AnnouncementController as ApiAnnouncementController;
 use App\Http\Controllers\FavoriteMenuController;
 
 /*
@@ -33,7 +34,10 @@ Route::prefix('v1')->group(function () {
     // Profile Management
     Route::middleware('auth:sanctum')->group(function () {
         Route::get('/profile', [ProfileController::class, 'show']);
-        Route::put('/profile', [ProfileController::class, 'update']);
+        Route::put('/profile', [ProfileController::class, 'update']); // Legacy endpoint
+        Route::put('/profile/info', [ProfileController::class, 'updateInfo']);
+        Route::post('/profile/info', [ProfileController::class, 'updateInfo']); // For multipart/form-data (file upload)
+        Route::put('/profile/password', [ProfileController::class, 'updatePassword']);
         
         // FCM Token Management
         Route::post('/user/fcm-token', [FcmTokenController::class, 'store']);
@@ -63,6 +67,7 @@ Route::prefix('v1')->group(function () {
     Route::get('/payment/finish', [PaymentController::class, 'finish']);
     
     // Discount
+    Route::get('/discounts/available', [DiscountController::class, 'getAvailable']);
     Route::post('/discount/verify', [DiscountController::class, 'verifyCode']);
 
     // Mobile Password Reset
@@ -82,4 +87,18 @@ Route::prefix('v1')->group(function () {
 
     // Settings
     Route::get('/settings', [SettingController::class, 'getStoreSettings']);
+
+    // Announcements (public)
+    Route::get('/announcements', [ApiAnnouncementController::class, 'index']);
+    Route::get('/announcements/latest', [ApiAnnouncementController::class, 'latest']);
+    Route::get('/announcements/count', [ApiAnnouncementController::class, 'count']);
+    Route::get('/announcements/{id}', [ApiAnnouncementController::class, 'show']);
+
+    // Announcements (authenticated customers only)
+    Route::middleware('auth:sanctum')->group(function () {
+        Route::get('/announcements/unread/list', [ApiAnnouncementController::class, 'unread']);
+        Route::post('/announcements/{id}/mark-as-read', [ApiAnnouncementController::class, 'markAsRead']);
+        Route::post('/announcements/{id}/mark-as-unread', [ApiAnnouncementController::class, 'markAsUnread']);
+        Route::post('/announcements/mark-all-as-read', [ApiAnnouncementController::class, 'markAllAsRead']);
+    });
 });

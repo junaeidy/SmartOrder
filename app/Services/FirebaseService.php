@@ -55,9 +55,10 @@ class FirebaseService
      * @param string $title
      * @param string $body
      * @param array $data
+     * @param int|null $customerId Optional customer ID for cleaning up invalid tokens
      * @return bool
      */
-    public function sendNotification(string $fcmToken, string $title, string $body, array $data = []): bool
+    public function sendNotification(string $fcmToken, string $title, string $body, array $data = [], ?int $customerId = null): bool
     {
         if (!$this->messaging) {
             Log::error('Firebase messaging not initialized');
@@ -80,19 +81,87 @@ class FirebaseService
                 'title' => $title,
                 'body' => $body,
                 'data' => $data,
+                'customer_id' => $customerId,
             ]);
 
             return true;
         } catch (MessagingException $e) {
-            Log::error('Failed to send push notification: ' . $e->getMessage(), [
+            $errorMessage = $e->getMessage();
+            
+            Log::error('Failed to send push notification: ' . $errorMessage, [
                 'title' => $title,
                 'body' => $body,
-                'error' => $e->getMessage(),
+                'error' => $errorMessage,
+                'fcm_token' => substr($fcmToken, 0, 20) . '...', // Log partial token for debugging
+                'customer_id' => $customerId,
             ]);
+
+            // Check if token is invalid and clean it up
+            if ($this->isInvalidTokenError($errorMessage) && $customerId) {
+                $this->cleanupInvalidToken($customerId, $fcmToken);
+            }
+
             return false;
         } catch (\Exception $e) {
-            Log::error('Unexpected error sending notification: ' . $e->getMessage());
+            Log::error('Unexpected error sending notification: ' . $e->getMessage(), [
+                'customer_id' => $customerId,
+                'fcm_token' => substr($fcmToken, 0, 20) . '...',
+            ]);
             return false;
+        }
+    }
+
+    /**
+     * Check if error message indicates an invalid or expired token
+     * 
+     * @param string $errorMessage
+     * @return bool
+     */
+    private function isInvalidTokenError(string $errorMessage): bool
+    {
+        $invalidTokenPatterns = [
+            'Requested entity was not found',
+            'Registration token is not a valid',
+            'The registration token is not a valid FCM registration token',
+            'Invalid registration token',
+            'Unregistered',
+        ];
+
+        foreach ($invalidTokenPatterns as $pattern) {
+            if (stripos($errorMessage, $pattern) !== false) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Clean up invalid FCM token from database
+     * 
+     * @param int $customerId
+     * @param string $fcmToken
+     * @return void
+     */
+    private function cleanupInvalidToken(int $customerId, string $fcmToken): void
+    {
+        try {
+            $customer = \App\Models\Customer::find($customerId);
+            
+            if ($customer && $customer->fcm_token === $fcmToken) {
+                $customer->fcm_token = null;
+                $customer->save();
+                
+                Log::info('Cleaned up invalid FCM token', [
+                    'customer_id' => $customerId,
+                    'token_preview' => substr($fcmToken, 0, 20) . '...',
+                ]);
+            }
+        } catch (\Exception $e) {
+            Log::error('Failed to cleanup invalid token', [
+                'customer_id' => $customerId,
+                'error' => $e->getMessage(),
+            ]);
         }
     }
 
@@ -107,10 +176,11 @@ class FirebaseService
     public function sendOrderStatusNotification(string $fcmToken, string $orderId, string $status): bool
     {
         $statusMessages = [
-            'waiting' => 'Pesanan Anda sedang diproses',
-            'awaiting_confirmation' => 'Pesanan Anda siap diambil',
-            'completed' => 'Pesanan Anda telah selesai',
-            'cancelled' => 'Pesanan Anda dibatalkan',
+            'waiting_for_payment' => 'Pesanan berhasil dibuat! Silakan selesaikan pembayaran Anda.',
+            'waiting' => 'Pembayaran berhasil! Pesanan Anda sedang diproses.',
+            'awaiting_confirmation' => 'Pesanan Anda siap diambil!',
+            'completed' => 'Pesanan Anda telah selesai. Terima kasih!',
+            'cancelled' => 'Pesanan Anda dibatalkan.',
         ];
 
         $title = 'Status Pesanan';
@@ -208,4 +278,64 @@ class FirebaseService
 
         return $successCount;
     }
+
+    /**
+     * Send announcement notification to all customers with FCM tokens
+     * 
+     * @param string $title
+     * @param string $message
+     * @param int|null $announcementId
+     * @return array ['success' => int, 'failed' => int, 'total' => int]
+     */
+    public function sendAnnouncementToAllCustomers(string $title, string $message, ?int $announcementId = null): array
+    {
+        // Get all customers with FCM tokens
+        $customers = \App\Models\Customer::whereNotNull('fcm_token')
+            ->where('fcm_token', '!=', '')
+            ->get();
+
+        $total = $customers->count();
+        $successCount = 0;
+        $failedCount = 0;
+        $failedCustomers = [];
+
+        foreach ($customers as $customer) {
+            $result = $this->sendNotification(
+                $customer->fcm_token,
+                $title,
+                $message,
+                [
+                    'type' => 'announcement',
+                    'announcement_id' => $announcementId,
+                ],
+                $customer->id // Pass customer ID for token cleanup
+            );
+
+            if ($result) {
+                $successCount++;
+            } else {
+                $failedCount++;
+                $failedCustomers[] = [
+                    'id' => $customer->id,
+                    'name' => $customer->name,
+                    'email' => $customer->email,
+                ];
+            }
+        }
+
+        Log::info('Announcement broadcast completed', [
+            'announcement_id' => $announcementId,
+            'total' => $total,
+            'success' => $successCount,
+            'failed' => $failedCount,
+            'failed_customers' => $failedCustomers,
+        ]);
+
+        return [
+            'total' => $total,
+            'success' => $successCount,
+            'failed' => $failedCount,
+        ];
+    }
 }
+

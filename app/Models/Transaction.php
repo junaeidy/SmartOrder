@@ -32,6 +32,7 @@ class Transaction extends Model
         'midtrans_payment_type',
         'midtrans_payment_url',
         'paid_at',
+        'payment_expires_at',
         'confirmation_email_sent_at',
         'queue_number',
         'status',
@@ -41,6 +42,7 @@ class Transaction extends Model
     protected $casts = [
         'items' => 'array',
         'paid_at' => 'datetime',
+        'payment_expires_at' => 'datetime',
         'cancelled_at' => 'datetime',
         'confirmation_email_sent_at' => 'datetime',
         'last_attempt_at' => 'datetime',

@@ -19,6 +19,7 @@ class CustomerResource extends JsonResource
             'name' => $this->name,
             'email' => $this->email,
             'phone' => $this->phone,
+            'profile_photo' => $this->profile_photo ? asset('storage/' . $this->profile_photo) : null,
             'created_at' => $this->created_at,
             'updated_at' => $this->updated_at,
         ];

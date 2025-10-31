@@ -81,6 +81,12 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::put('/kasir/discounts/{discount}', [App\Http\Controllers\Admin\DiscountController::class, 'update'])->name('admin.discounts.update');
         Route::delete('/kasir/discounts/{discount}', [App\Http\Controllers\Admin\DiscountController::class, 'destroy'])->name('admin.discounts.destroy');
         Route::put('/kasir/discounts/{discount}/toggle', [App\Http\Controllers\Admin\DiscountController::class, 'toggleActive'])->name('admin.discounts.toggle');
+        
+        // Announcements
+        Route::get('/kasir/announcements', [App\Http\Controllers\AnnouncementController::class, 'index'])->name('kasir.announcements');
+        Route::post('/kasir/announcements', [App\Http\Controllers\AnnouncementController::class, 'store'])->name('kasir.announcements.store');
+        Route::post('/kasir/announcements/{announcement}/send', [App\Http\Controllers\AnnouncementController::class, 'send'])->name('kasir.announcements.send');
+        Route::delete('/kasir/announcements/{announcement}', [App\Http\Controllers\AnnouncementController::class, 'destroy'])->name('kasir.announcements.destroy');
     });
 
     Route::middleware(['role:karyawan'])->group(function () {

@@ -9,6 +9,7 @@ use App\Http\Resources\Api\V1\CustomerResource;
 use App\Models\Customer;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
 
 class AuthController extends Controller
@@ -26,9 +27,17 @@ class AuthController extends Controller
             'email' => $request->email,
             'phone' => $request->phone,
             'password' => Hash::make($request->password),
+            'fcm_token' => $request->fcm_token, // Save FCM token during registration
         ]);
 
         $token = $customer->createToken('auth_token')->plainTextToken;
+
+        if ($request->filled('fcm_token')) {
+            Log::info('FCM token saved during registration', [
+                'customer_id' => $customer->id,
+                'token_preview' => substr($request->fcm_token, 0, 20) . '...',
+            ]);
+        }
 
         return response()->json([
             'success' => true,
@@ -56,6 +65,17 @@ class AuthController extends Controller
             ]);
         }
 
+        // Update FCM token if provided during login
+        if ($request->filled('fcm_token')) {
+            $customer->fcm_token = $request->fcm_token;
+            $customer->save();
+            
+            Log::info('FCM token updated during login', [
+                'customer_id' => $customer->id,
+                'token_preview' => substr($request->fcm_token, 0, 20) . '...',
+            ]);
+        }
+
         return response()->json([
             'success' => true,
             'message' => 'Login berhasil',
@@ -74,6 +94,16 @@ class AuthController extends Controller
      */
     public function logout(Request $request)
     {
+        $customer = $request->user();
+        
+        // Clear FCM token on logout
+        $customer->fcm_token = null;
+        $customer->save();
+        
+        Log::info('Customer logged out and FCM token cleared', [
+            'customer_id' => $customer->id,
+        ]);
+        
         $request->user()->currentAccessToken()->delete();
 
         return response()->json([

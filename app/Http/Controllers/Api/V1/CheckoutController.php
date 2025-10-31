@@ -230,7 +230,8 @@ class CheckoutController extends Controller
 
                 // Discounts
                 $discountCode = $request->discountCode ?? null;
-                $discount = $this->getApplicableDiscount($totalAmount, $discountCode);
+                $deviceId = $request->deviceId ?? null; // Get device ID from request
+                $discount = $this->getApplicableDiscount($totalAmount, $discountCode, $customer->id, $deviceId);
                 $discountAmount = 0;
                 if ($discount) {
                     $discountAmount = $discount->calculateDiscount($totalAmount);
@@ -251,6 +252,11 @@ class CheckoutController extends Controller
                 // Status awal
                 $initialStatus = ($paymentMethod === 'cash') ? 'waiting' : 'waiting_for_payment';
                 $paymentStatus = 'pending';
+                
+                // Set payment expiration time (15 minutes for midtrans, null for cash)
+                $paymentExpiresAt = ($paymentMethod === 'midtrans') 
+                    ? Carbon::now()->addMinutes(15) 
+                    : null;
 
                 // Second pass: decrement stocks and build items
                 foreach ($lockedProducts as [$product, $quantity]) {
@@ -292,10 +298,21 @@ class CheckoutController extends Controller
                     'discount_id' => $discount ? $discount->id : null,
                     'payment_method' => $paymentMethod,
                     'payment_status' => $paymentStatus,
+                    'payment_expires_at' => $paymentExpiresAt,
                     'queue_number' => $queueNumber,
                     'status' => $initialStatus,
                     'items' => $processedItems,
                 ]);
+                
+                // Record discount usage if discount was applied
+                if ($discount && $discountAmount > 0) {
+                    $discount->recordUsage(
+                        $customer->id,
+                        $deviceId,
+                        $transaction->id,
+                        $discountAmount
+                    );
+                }
 
                 // If payment method is midtrans, create payment transaction now
                 if ($paymentMethod === 'midtrans') {
@@ -327,9 +344,13 @@ class CheckoutController extends Controller
 
         // After commit: midtrans flow or cash flow
         if ($paymentMethod === 'midtrans') {
+            // For midtrans: ONLY send push notification to customer
+            // NewOrderReceived event will be triggered AFTER payment confirmation
+            event(new \App\Events\OrderStatusChanged($transaction));
+            
             $response = response()->json([
                 'success' => true,
-                'message' => 'Transaksi berhasil dibuat',
+                'message' => 'Transaksi berhasil dibuat. Silakan lanjutkan pembayaran.',
                 'data' => [
                     'transaction' => new OrderResource($transaction),
                     'snapToken' => $midtransResponse['snap_token'],
@@ -344,11 +365,16 @@ class CheckoutController extends Controller
             } catch (\Exception $e) {
                 Log::error('Error sending email: ' . $e->getMessage());
             }
+            
+            // Broadcast new order event for kitchen/kasir
             event(new NewOrderReceived($transaction));
+            
+            // Send push notification to customer
+            event(new \App\Events\OrderStatusChanged($transaction));
 
             $response = response()->json([
                 'success' => true,
-                'message' => 'Transaksi berhasil dibuat',
+                'message' => 'Pesanan berhasil dibuat. Silakan menunggu nomor antrian Anda dipanggil.',
                 'data' => [
                     'transaction' => new OrderResource($transaction)
                 ]
@@ -497,37 +523,63 @@ class CheckoutController extends Controller
      *
      * @param float $totalAmount
      * @param string|null $discountCode
+     * @param int|null $customerId
+     * @param string|null $deviceId
      * @return \App\Models\Discount|null
      */
-    private function getApplicableDiscount($amount, $discountCode = null)
+    private function getApplicableDiscount($amount, $discountCode = null, $customerId = null, $deviceId = null)
     {
+        // Get all active discounts that meet minimum purchase requirement
         $query = \App\Models\Discount::where('active', true)
-            ->where('min_purchase', '<=', $amount)
-            ->where(function($query) {
-                $now = now();
-                $query->whereNull('valid_from')
-                    ->orWhere('valid_from', '<=', $now);
-            })
-            ->where(function($query) {
-                $now = now();
-                $query->whereNull('valid_until')
-                    ->orWhere('valid_until', '>=', $now);
-            });
+            ->where('min_purchase', '<=', $amount);
             
         if ($discountCode) {
+            // If discount code is provided, find that specific discount
             $discount = $query->where('code', $discountCode)->first();
-            if ($discount) {
-                return $discount;
+            
+            if (!$discount) {
+                return null;
             }
-            return null;
+            
+            // Validate if discount is currently valid (includes date and time validation)
+            if (!$discount->isValid()) {
+                return null;
+            }
+            
+            // Check if customer/device can use this discount
+            if (!$discount->canBeUsedBy($customerId, $deviceId)) {
+                throw new \RuntimeException('Anda sudah menggunakan kode diskon ini sebelumnya');
+            }
+            
+            return $discount;
         }
         
+        // Get all discounts that don't require code
         $discounts = $query->where('requires_code', false)->get();
         
         if ($discounts->isEmpty()) {
             return null;
         }
         
-        return $discounts->sortByDesc('percentage')->first();
+        // Filter valid discounts (includes date and time validation + usage check)
+        $validDiscounts = $discounts->filter(function($discount) use ($customerId, $deviceId) {
+            if (!$discount->isValid()) {
+                return false;
+            }
+            
+            // Check if customer/device can use this discount
+            if (!$discount->canBeUsedBy($customerId, $deviceId)) {
+                return false;
+            }
+            
+            return true;
+        });
+        
+        if ($validDiscounts->isEmpty()) {
+            return null;
+        }
+        
+        // Return the discount with highest percentage
+        return $validDiscounts->sortByDesc('percentage')->first();
     }
 }
