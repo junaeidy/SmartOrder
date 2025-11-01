@@ -15,6 +15,7 @@ use App\Events\NewOrderReceived;
 use Carbon\Carbon;
 use App\Events\ProductStockAlert;
 use Illuminate\Support\Facades\DB;
+use App\Helpers\BroadcastHelper;
 
 class CheckoutController extends Controller
 {
@@ -184,9 +185,9 @@ class CheckoutController extends Controller
 
                 // Broadcast threshold alerts (inside TX is fine; queued to broadcast)
                 if ($product->stok <= 0 && $prevStock > 0) {
-                    event(new ProductStockAlert($product, 'out_of_stock'));
+                    BroadcastHelper::safeBroadcast(new ProductStockAlert($product, 'out_of_stock'));
                 } elseif ($product->stok <= 20 && $prevStock > 20) {
-                    event(new ProductStockAlert($product, 'low_stock'));
+                    BroadcastHelper::safeBroadcast(new ProductStockAlert($product, 'low_stock'));
                 }
 
                 $processedItems[] = [
@@ -257,7 +258,7 @@ class CheckoutController extends Controller
         } catch (\Exception $e) {
             Log::error('Error sending email: ' . $e->getMessage());
         }
-        event(new NewOrderReceived($transaction));
+        BroadcastHelper::safeBroadcast(new NewOrderReceived($transaction));
 
         return Inertia::render('ThankYou', [
             'transaction' => $transaction,

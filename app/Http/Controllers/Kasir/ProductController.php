@@ -4,15 +4,21 @@ namespace App\Http\Controllers\Kasir;
 
 use App\Http\Controllers\Controller;
 use App\Models\Product;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Illuminate\Support\Facades\Storage;
 use App\Events\ProductStockAlert;
+use App\Helpers\BroadcastHelper;
 
 class ProductController extends Controller
 {
+    use AuthorizesRequests;
     public function index(Request $request)
     {
+        // Authorization check (optional for index, but good practice)
+        $this->authorize('viewAny', Product::class);
+
         $search = $request->get('search');
 
         $products = Product::query()
@@ -35,6 +41,9 @@ class ProductController extends Controller
 
     public function store(Request $request)
     {
+        // Authorization check
+        $this->authorize('create', Product::class);
+
         $validated = $request->validate([
             'nama' => 'required|string|max:255',
             'harga' => 'required|numeric',
@@ -52,6 +61,9 @@ class ProductController extends Controller
 
     public function update(Request $request, Product $product)
     {
+        // Authorization check
+        $this->authorize('update', $product);
+
         $data = $request->validate([
             'nama' => 'required|string',
             'harga' => 'required|numeric',
@@ -75,9 +87,9 @@ class ProductController extends Controller
 
         // Broadcast alerts when crossing thresholds
         if ($product->stok <= 0 && $prevStock > 0) {
-            event(new ProductStockAlert($product, 'out_of_stock'));
+            BroadcastHelper::safeBroadcast(new ProductStockAlert($product, 'out_of_stock'));
         } elseif ($product->stok <= 20 && $prevStock > 20) {
-            event(new ProductStockAlert($product, 'low_stock'));
+            BroadcastHelper::safeBroadcast(new ProductStockAlert($product, 'low_stock'));
         }
 
         return back()->with('success', 'Produk berhasil diperbarui.');
@@ -85,6 +97,9 @@ class ProductController extends Controller
 
     public function destroy(Product $product)
     {
+        // Authorization check
+        $this->authorize('delete', $product);
+
         if ($product->gambar && Storage::disk('public')->exists($product->gambar)) {
             Storage::disk('public')->delete($product->gambar);
         }
@@ -96,10 +111,13 @@ class ProductController extends Controller
     // Toggle closed (hide from ordering but keep visible)
     public function toggleClosed(Product $product)
     {
+        // Authorization check
+        $this->authorize('toggleClosed', $product);
+
         $product->closed = !$product->closed;
         $product->save();
 
-        event(new ProductStockAlert($product, $product->closed ? 'closed' : 'opened'));
+        BroadcastHelper::safeBroadcast(new ProductStockAlert($product, $product->closed ? 'closed' : 'opened'));
 
         return back()->with('success', $product->closed ? 'Produk ditutup sementara.' : 'Produk dibuka kembali.');
     }

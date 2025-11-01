@@ -61,6 +61,22 @@ class Customer extends Authenticatable
     }
 
     /**
+     * Get the customer's device tokens
+     */
+    public function deviceTokens()
+    {
+        return $this->hasMany(DeviceToken::class);
+    }
+
+    /**
+     * Get active device tokens
+     */
+    public function activeDeviceTokens()
+    {
+        return $this->hasMany(DeviceToken::class)->whereNull('revoked_at');
+    }
+
+    /**
      * Get announcements that have been read by this customer
      */
     public function readAnnouncements()

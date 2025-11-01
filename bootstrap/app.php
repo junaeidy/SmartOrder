@@ -5,6 +5,8 @@ use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Console\Scheduling\Schedule;
+use Illuminate\Broadcasting\BroadcastException;
+use Illuminate\Support\Facades\Log;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -33,6 +35,12 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->web(append: [
             \App\Http\Middleware\HandleInertiaRequests::class,
             \Illuminate\Http\Middleware\AddLinkHeadersForPreloadedAssets::class,
+            \App\Http\Middleware\SecurityHeaders::class,
+        ]);
+
+        // Apply security headers to API routes as well
+        $middleware->api(append: [
+            \App\Http\Middleware\SecurityHeaders::class,
         ]);
 
         // Exempt Midtrans webhook endpoints from CSRF verification
@@ -44,8 +52,23 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'role' => RoleMiddleware::class,
             'checkout.rate.limit' => \App\Http\Middleware\CheckoutRateLimit::class,
+            'rate.limit' => \App\Http\Middleware\ApiRateLimiter::class,
+            'device.token' => \App\Http\Middleware\ValidateDeviceToken::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {
-        //
+        // Handle broadcasting exceptions gracefully
+        $exceptions->reportable(function (BroadcastException $e) {
+            Log::warning('Broadcasting error occurred', [
+                'message' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+            // Don't throw the exception, just log it
+            return false;
+        });
+        
+        // Prevent broadcasting exceptions from being displayed to users
+        $exceptions->dontReport([
+            BroadcastException::class,
+        ]);
     })->create();

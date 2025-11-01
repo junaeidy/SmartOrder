@@ -18,6 +18,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use App\Mail\OrderConfirmation;
+use App\Helpers\BroadcastHelper;
 
 class CheckoutController extends Controller
 {
@@ -266,9 +267,9 @@ class CheckoutController extends Controller
 
                     // Broadcast threshold alerts (inside TX is fine; queued to broadcast)
                     if ($product->stok <= 0 && $prevStock > 0) {
-                        event(new ProductStockAlert($product, 'out_of_stock'));
+                        BroadcastHelper::safeBroadcast(new ProductStockAlert($product, 'out_of_stock'));
                     } elseif ($product->stok <= 20 && $prevStock > 20) {
-                        event(new ProductStockAlert($product, 'low_stock'));
+                        BroadcastHelper::safeBroadcast(new ProductStockAlert($product, 'low_stock'));
                     }
 
                     $processedItems[] = [
@@ -367,10 +368,10 @@ class CheckoutController extends Controller
             }
             
             // Broadcast new order event for kitchen/kasir
-            event(new NewOrderReceived($transaction));
+            BroadcastHelper::safeBroadcast(new NewOrderReceived($transaction));
             
             // Send push notification to customer
-            event(new \App\Events\OrderStatusChanged($transaction));
+            BroadcastHelper::safeBroadcast(new \App\Events\OrderStatusChanged($transaction));
 
             $response = response()->json([
                 'success' => true,

@@ -12,23 +12,10 @@ use Carbon\Carbon;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Broadcast;
 
-Route::get('/', [App\Http\Controllers\ProductController::class, 'index'])
-    ->middleware('guest')
-    ->name('welcome');
-    
-Route::get('/checkout', [CheckoutController::class, 'checkout'])
-    ->name('checkout');
-    
-Route::post('/checkout/process', [CheckoutController::class, 'process'])
-    ->middleware('throttle:20,1')
-    ->name('checkout.process');
-// Validate cart availability
-Route::post('/cart/validate', [CheckoutController::class, 'validateCart'])
-    ->middleware('throttle:60,1')
-    ->name('cart.validate');
-    
-Route::get('/thankyou/{transaction}', [CheckoutController::class, 'thankyou'])
-    ->name('checkout.thankyou');
+// Redirect root to login
+Route::get('/', function () {
+    return redirect()->route('login');
+});
 
 // Midtrans Routes
 Route::post('/midtrans/notification', [App\Http\Controllers\MidtransController::class, 'notification'])
@@ -48,7 +35,7 @@ Route::prefix('api')->group(function () {
     Route::get('/payment/check-status/{orderId}', [App\Http\Controllers\MidtransController::class, 'checkStatus'])
         ->name('payment.check.status');
 });
-    
+
 // Admin route to manually reset the queue counter (protected by admin middleware in production)
 Route::get('/admin/reset-queue', function() {
     Artisan::call('queue:reset-counter');

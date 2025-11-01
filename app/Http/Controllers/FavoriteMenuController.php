@@ -21,7 +21,7 @@ class FavoriteMenuController extends Controller
             if (!$customer) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Customer not authenticated'
+                    'message' => 'Pelanggan tidak diautentikasi'
                 ], 401);
             }
 
@@ -45,14 +45,14 @@ class FavoriteMenuController extends Controller
 
             return response()->json([
                 'success' => true,
-                'message' => 'Favorite menus retrieved successfully',
+                'message' => 'Menu favorit berhasil diambil',
                 'data' => $favoriteProducts
             ]);
 
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to retrieve favorite menus',
+                'message' => 'Gagal mengambil menu favorit',
                 'error' => $e->getMessage()
             ], 500);
         }
@@ -69,7 +69,7 @@ class FavoriteMenuController extends Controller
             if (!$customer) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Customer not authenticated'
+                    'message' => 'Pelanggan tidak diautentikasi'
                 ], 401);
             }
 
@@ -85,7 +85,7 @@ class FavoriteMenuController extends Controller
             if ($existingFavorite) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Product is already in your favorites'
+                    'message' => 'Produk sudah ada di favorit Anda'
                 ], 409);
             }
 
@@ -100,7 +100,7 @@ class FavoriteMenuController extends Controller
 
             return response()->json([
                 'success' => true,
-                'message' => 'Product added to favorites successfully',
+                'message' => 'Produk berhasil ditambahkan ke favorit',
                 'data' => [
                     'favorite_id' => $favorite->id,
                     'product' => [
@@ -123,7 +123,7 @@ class FavoriteMenuController extends Controller
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to add product to favorites',
+                'message' => 'Gagal menambahkan produk ke favorit',
                 'error' => $e->getMessage()
             ], 500);
         }
@@ -140,7 +140,7 @@ class FavoriteMenuController extends Controller
             if (!$customer) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Customer not authenticated'
+                    'message' => 'Pelanggan tidak diautentikasi'
                 ], 401);
             }
 
@@ -151,7 +151,7 @@ class FavoriteMenuController extends Controller
             if (!$favorite) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Product not found in favorites'
+                    'message' => 'Produk tidak ditemukan di favorit'
                 ], 404);
             }
 
@@ -159,13 +159,13 @@ class FavoriteMenuController extends Controller
 
             return response()->json([
                 'success' => true,
-                'message' => 'Product removed from favorites successfully'
+                'message' => 'Produk berhasil dihapus dari favorit'
             ]);
 
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to remove product from favorites',
+                'message' => 'Gagal menghapus produk dari favorit',
                 'error' => $e->getMessage()
             ], 500);
         }
@@ -182,7 +182,7 @@ class FavoriteMenuController extends Controller
             if (!$customer) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Customer not authenticated'
+                    'message' => 'Pelanggan tidak diautentikasi'
                 ], 401);
             }
 
@@ -200,7 +200,7 @@ class FavoriteMenuController extends Controller
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to check favorite status',
+                'message' => 'Gagal memeriksa status favorit produk',
                 'error' => $e->getMessage()
             ], 500);
         }
