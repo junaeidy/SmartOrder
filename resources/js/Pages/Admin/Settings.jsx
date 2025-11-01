@@ -51,6 +51,8 @@ export default function Settings({ auth, storeHours, storeSettings, discounts })
         requires_code: true,
         valid_from: '',
         valid_until: '',
+        time_from: '',
+        time_until: '',
     });
 
     // Edit Discount Form
@@ -65,6 +67,8 @@ export default function Settings({ auth, storeHours, storeSettings, discounts })
         requires_code: true,
         valid_from: '',
         valid_until: '',
+        time_from: '',
+        time_until: '',
     });
 
     const submitStoreHours = (e) => {
@@ -166,6 +170,8 @@ export default function Settings({ auth, storeHours, storeSettings, discounts })
             requires_code: discount.requires_code ?? true,
             valid_from: discount.valid_from ? new Date(discount.valid_from).toISOString().split('T')[0] : '',
             valid_until: discount.valid_until ? new Date(discount.valid_until).toISOString().split('T')[0] : '',
+            time_from: discount.time_from ? discount.time_from.split(':').slice(0, 2).join(':') : '',
+            time_until: discount.time_until ? discount.time_until.split(':').slice(0, 2).join(':') : '',
         });
     };
 
@@ -538,6 +544,32 @@ export default function Settings({ auth, storeHours, storeSettings, discounts })
                                                     <InputError message={newDiscountForm.errors.valid_until} className="mt-2" />
                                                 </div>
 
+                                                <div>
+                                                    <InputLabel htmlFor="time_from" value="Jam Mulai (Opsional)" />
+                                                    <TextInput
+                                                        id="time_from"
+                                                        type="time"
+                                                        className="mt-1 block w-full text-sm"
+                                                        value={newDiscountForm.data.time_from}
+                                                        onChange={(e) => newDiscountForm.setData('time_from', e.target.value)}
+                                                    />
+                                                    <InputError message={newDiscountForm.errors.time_from} className="mt-2" />
+                                                    <p className="text-xs text-gray-500 mt-1">Jam berapa diskon mulai bisa digunakan</p>
+                                                </div>
+
+                                                <div>
+                                                    <InputLabel htmlFor="time_until" value="Jam Selesai (Opsional)" />
+                                                    <TextInput
+                                                        id="time_until"
+                                                        type="time"
+                                                        className="mt-1 block w-full text-sm"
+                                                        value={newDiscountForm.data.time_until}
+                                                        onChange={(e) => newDiscountForm.setData('time_until', e.target.value)}
+                                                    />
+                                                    <InputError message={newDiscountForm.errors.time_until} className="mt-2" />
+                                                    <p className="text-xs text-gray-500 mt-1">Jam berapa diskon selesai bisa digunakan</p>
+                                                </div>
+
                                                 <div className="md:col-span-2">
                                                     <InputLabel htmlFor="description" value="Deskripsi (Opsional)" />
                                                     <textarea
@@ -701,6 +733,30 @@ export default function Settings({ auth, storeHours, storeSettings, discounts })
                                                                                     />
                                                                                 </div>
 
+                                                                                <div>
+                                                                                    <InputLabel htmlFor="edit_time_from" value="Jam Mulai (Opsional)" />
+                                                                                    <TextInput
+                                                                                        id="edit_time_from"
+                                                                                        type="time"
+                                                                                        className="mt-1 block w-full"
+                                                                                        value={editDiscountForm.data.time_from}
+                                                                                        onChange={(e) => editDiscountForm.setData('time_from', e.target.value)}
+                                                                                    />
+                                                                                    <p className="text-xs text-gray-500 mt-1">Jam berapa diskon mulai bisa digunakan</p>
+                                                                                </div>
+
+                                                                                <div>
+                                                                                    <InputLabel htmlFor="edit_time_until" value="Jam Selesai (Opsional)" />
+                                                                                    <TextInput
+                                                                                        id="edit_time_until"
+                                                                                        type="time"
+                                                                                        className="mt-1 block w-full"
+                                                                                        value={editDiscountForm.data.time_until}
+                                                                                        onChange={(e) => editDiscountForm.setData('time_until', e.target.value)}
+                                                                                    />
+                                                                                    <p className="text-xs text-gray-500 mt-1">Jam berapa diskon selesai bisa digunakan</p>
+                                                                                </div>
+
                                                                                 <div className="md:col-span-2">
                                                                                     <InputLabel htmlFor="edit_description" value="Deskripsi (Opsional)" />
                                                                                     <textarea
@@ -763,7 +819,14 @@ export default function Settings({ auth, storeHours, storeSettings, discounts })
                                                                         </td>
                                                                         <td className="px-3 py-2 whitespace-nowrap">
                                                                             <div className="text-sm text-gray-500 dark:text-gray-400">
-                                                                                {discount.valid_from ? formatDate(discount.valid_from) : '-'} s/d {discount.valid_until ? formatDate(discount.valid_until) : '-'}
+                                                                                <div>
+                                                                                    {discount.valid_from ? formatDate(discount.valid_from) : '-'} s/d {discount.valid_until ? formatDate(discount.valid_until) : '-'}
+                                                                                </div>
+                                                                                {(discount.time_from || discount.time_until) && (
+                                                                                    <div className="text-xs text-gray-400 dark:text-gray-500 mt-1">
+                                                                                        🕐 {discount.time_from || '00:00'} - {discount.time_until || '23:59'}
+                                                                                    </div>
+                                                                                )}
                                                                             </div>
                                                                         </td>
                                                                         <td className="px-3 py-2 whitespace-nowrap">

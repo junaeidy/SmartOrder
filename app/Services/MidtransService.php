@@ -254,6 +254,47 @@ class MidtransService
     }
 
     /**
+     * Verify Midtrans notification signature.
+     * 
+     * @param object $notification
+     * @return bool
+     * @throws \Exception
+     */
+    public function verifySignature($notification): bool
+    {
+        // Check if all required fields are present
+        if (!isset($notification->signature_key, $notification->order_id, $notification->status_code, $notification->gross_amount)) {
+            \Illuminate\Support\Facades\Log::error('Missing required fields for signature verification', [
+                'notification' => (array) $notification,
+            ]);
+            throw new \Exception('Missing required fields for signature verification');
+        }
+
+        $serverKey = Config::$serverKey;
+        $orderId = $notification->order_id;
+        $statusCode = $notification->status_code;
+        $grossAmount = $notification->gross_amount;
+        $signatureKey = $notification->signature_key;
+
+        // Create hash string according to Midtrans documentation
+        $hashString = $orderId . $statusCode . $grossAmount . $serverKey;
+        $computedSignature = hash('sha512', $hashString);
+
+        // Use hash_equals for timing-safe comparison
+        $isValid = hash_equals($computedSignature, $signatureKey);
+
+        if (!$isValid) {
+            \Illuminate\Support\Facades\Log::error('Invalid Midtrans signature', [
+                'order_id' => $orderId,
+                'expected' => substr($computedSignature, 0, 20) . '...',
+                'received' => substr($signatureKey, 0, 20) . '...',
+            ]);
+        }
+
+        return $isValid;
+    }
+
+    /**
      * Handle notification callback from Midtrans
      * 
      * @param array $notification
@@ -268,27 +309,29 @@ class MidtransService
         
         \Illuminate\Support\Facades\Log::info('Received Midtrans notification: ', (array) $notification);
 
-        // Optional: Verify Midtrans signature when available
+        // 🔒 CRITICAL: Verify signature (mandatory for security)
         try {
-            if (isset($notification->signature_key, $notification->order_id, $notification->status_code, $notification->gross_amount)) {
-                $serverKey = Config::$serverKey;
-                $raw = $notification->order_id . $notification->status_code . $notification->gross_amount . $serverKey;
-                $computedSignature = hash('sha512', $raw);
-                if (!hash_equals($computedSignature, $notification->signature_key)) {
-                    \Illuminate\Support\Facades\Log::warning('Invalid Midtrans signature detected', [
-                        'order_id' => $notification->order_id,
-                    ]);
-                    return [
-                        'success' => false,
-                        'message' => 'Invalid Midtrans signature',
-                    ];
-                }
+            if (!$this->verifySignature($notification)) {
+                \Illuminate\Support\Facades\Log::warning('Midtrans signature verification failed', [
+                    'order_id' => $notification->order_id ?? 'unknown',
+                ]);
+                return [
+                    'success' => false,
+                    'message' => 'Invalid signature',
+                ];
             }
-        } catch (\Throwable $e) {
-            \Illuminate\Support\Facades\Log::warning('Midtrans signature verification error', [
-                'error' => $e->getMessage(),
+            \Illuminate\Support\Facades\Log::info('Midtrans signature verified successfully', [
+                'order_id' => $notification->order_id,
             ]);
-            // Proceed without blocking in case of unexpected format
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error('Midtrans signature verification error', [
+                'error' => $e->getMessage(),
+                'notification' => (array) $notification,
+            ]);
+            return [
+                'success' => false,
+                'message' => 'Signature verification error: ' . $e->getMessage(),
+            ];
         }
         
         // Find transaction by the midtrans_transaction_id (not our kode_transaksi)

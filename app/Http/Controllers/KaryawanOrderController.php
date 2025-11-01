@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Transaction;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
+use App\Helpers\BroadcastHelper;
 
 class KaryawanOrderController extends Controller
 {
@@ -68,7 +69,7 @@ class KaryawanOrderController extends Controller
         $transaction->save();
 
         // Broadcast status change for realtime dashboards
-        event(new \App\Events\OrderStatusChanged($transaction));
+        BroadcastHelper::safeBroadcast(new \App\Events\OrderStatusChanged($transaction));
 
         return back()->with('success', 'Order has been processed successfully');
     }

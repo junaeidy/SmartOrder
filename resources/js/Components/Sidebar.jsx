@@ -1,5 +1,5 @@
 import { Link, usePage } from "@inertiajs/react";
-import { Home, Users, ClipboardList, ShoppingCart, Settings, Donut, Grid2X2PlusIcon } from "lucide-react";
+import { Home, Users, ClipboardList, ShoppingCart, Settings, Donut, Grid2X2PlusIcon, Megaphone } from "lucide-react";
 
 export default function Sidebar() {
   const { url } = usePage();
@@ -20,6 +20,7 @@ export default function Sidebar() {
       { label: "Transaksi", icon: <ShoppingCart size={18} />, href: route("kasir.transaksi") },
       { label: "Laporan", icon: <Grid2X2PlusIcon size={18} />, href: route("kasir.reports") },
       { label: "Produk", icon: <Donut size={18} />, href: route("products.index") },
+      { label: "Pengumuman", icon: <Megaphone size={18} />, href: route("kasir.announcements") },
       { label: "Pengaturan", icon: <Settings size={18} />, href: route('admin.settings') },
     ],
     karyawan: [

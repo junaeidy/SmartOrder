@@ -155,6 +155,27 @@ const Orders = ({ pendingOrders, completedOrders, auth }) => {
         return new Date(dateString).toLocaleDateString('id-ID', options);
     };
     
+    // Calculate elapsed time since order was created
+    const calculateElapsedTime = (createdAt) => {
+        const created = new Date(createdAt);
+        const now = currentTime;
+        
+        const diffMs = now - created;
+        const diffSecs = Math.floor(diffMs / 1000);
+        const diffMins = Math.floor(diffSecs / 60);
+        const diffHours = Math.floor(diffMins / 60);
+        
+        if (diffMins < 1) {
+            return `${diffSecs} detik`;
+        } else if (diffMins < 60) {
+            const secs = diffSecs % 60;
+            return `${diffMins}:${secs.toString().padStart(2, '0')}`;
+        } else {
+            const mins = diffMins % 60;
+            return `${diffHours}:${mins.toString().padStart(2, '0')}:${(diffSecs % 60).toString().padStart(2, '0')}`;
+        }
+    };
+    
     // Format time for real-time clock
     const formatTime = (date) => {
         const hours = date.getHours().toString().padStart(2, '0');
@@ -406,7 +427,7 @@ const Orders = ({ pendingOrders, completedOrders, auth }) => {
                                 </span>
                             </div>
                             
-                            <div className="mb-6 bg-blue-900/30 border border-blue-800 rounded-lg p-4 text-blue-200">
+                            <div className="mb-6 bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded-lg p-4 text-blue-800 dark:text-blue-200">
                                 <p>Klik kartu pesanan untuk mengirim ke kasir (menunggu konfirmasi). Pesanan baru akan muncul otomatis disertai suara notifikasi.</p>
                             </div>
                         </>
@@ -434,9 +455,9 @@ const Orders = ({ pendingOrders, completedOrders, auth }) => {
                                                     <span className="bg-orange-500/20 text-orange-400 px-3 py-1.5 rounded text-base font-bold">
                                                         #{order.queue_number}
                                                     </span>
-                                                    <div className="flex items-center ml-2 bg-blue-900/30 px-2 py-1 rounded">
-                                                        <Clock className="w-3 h-3 text-blue-300 mr-1" />
-                                                        <span className="text-xs text-blue-300">
+                                                    <div className="flex items-center ml-2 bg-blue-100 dark:bg-blue-900/30 px-2 py-1 rounded">
+                                                        <Clock className="w-3 h-3 text-blue-600 dark:text-blue-300 mr-1" />
+                                                        <span className="text-xs text-blue-700 dark:text-blue-300">
                                                             {new Date(order.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
                                                         </span>
                                                     </div>
@@ -454,11 +475,14 @@ const Orders = ({ pendingOrders, completedOrders, auth }) => {
                                                     <span className="text-gray-600 dark:text-gray-400">Item:</span>
                                                     <span className="font-medium text-gray-900 dark:text-white">{order.total_items}</span>
                                                 </div>
-                                                <div className="flex justify-between">
-                                                    <span className="text-gray-600 dark:text-gray-400">Total:</span>
-                                                    <span className="font-bold text-orange-600 dark:text-orange-400">
-                                                        {formatCurrency(order.total_amount)}
-                                                    </span>
+                                                <div className="flex justify-between items-center">
+                                                    <span className="text-gray-600 dark:text-gray-400">Waktu:</span>
+                                                    <div className="flex items-center gap-1">
+                                                        <Clock className="w-4 h-4 text-orange-500 animate-pulse" />
+                                                        <span className="font-bold text-orange-600 dark:text-orange-400 font-mono">
+                                                            {calculateElapsedTime(order.created_at)}
+                                                        </span>
+                                                    </div>
                                                 </div>
                                             </div>
                                             

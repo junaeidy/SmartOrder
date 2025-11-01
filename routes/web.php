@@ -12,23 +12,10 @@ use Carbon\Carbon;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Broadcast;
 
-Route::get('/', [App\Http\Controllers\ProductController::class, 'index'])
-    ->middleware('guest')
-    ->name('welcome');
-    
-Route::get('/checkout', [CheckoutController::class, 'checkout'])
-    ->name('checkout');
-    
-Route::post('/checkout/process', [CheckoutController::class, 'process'])
-    ->middleware('throttle:20,1')
-    ->name('checkout.process');
-// Validate cart availability
-Route::post('/cart/validate', [CheckoutController::class, 'validateCart'])
-    ->middleware('throttle:60,1')
-    ->name('cart.validate');
-    
-Route::get('/thankyou/{transaction}', [CheckoutController::class, 'thankyou'])
-    ->name('checkout.thankyou');
+// Redirect root to login
+Route::get('/', function () {
+    return redirect()->route('login');
+});
 
 // Midtrans Routes
 Route::post('/midtrans/notification', [App\Http\Controllers\MidtransController::class, 'notification'])
@@ -48,7 +35,7 @@ Route::prefix('api')->group(function () {
     Route::get('/payment/check-status/{orderId}', [App\Http\Controllers\MidtransController::class, 'checkStatus'])
         ->name('payment.check.status');
 });
-    
+
 // Admin route to manually reset the queue counter (protected by admin middleware in production)
 Route::get('/admin/reset-queue', function() {
     Artisan::call('queue:reset-counter');
@@ -81,6 +68,12 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::put('/kasir/discounts/{discount}', [App\Http\Controllers\Admin\DiscountController::class, 'update'])->name('admin.discounts.update');
         Route::delete('/kasir/discounts/{discount}', [App\Http\Controllers\Admin\DiscountController::class, 'destroy'])->name('admin.discounts.destroy');
         Route::put('/kasir/discounts/{discount}/toggle', [App\Http\Controllers\Admin\DiscountController::class, 'toggleActive'])->name('admin.discounts.toggle');
+        
+        // Announcements
+        Route::get('/kasir/announcements', [App\Http\Controllers\AnnouncementController::class, 'index'])->name('kasir.announcements');
+        Route::post('/kasir/announcements', [App\Http\Controllers\AnnouncementController::class, 'store'])->name('kasir.announcements.store');
+        Route::post('/kasir/announcements/{announcement}/send', [App\Http\Controllers\AnnouncementController::class, 'send'])->name('kasir.announcements.send');
+        Route::delete('/kasir/announcements/{announcement}', [App\Http\Controllers\AnnouncementController::class, 'destroy'])->name('kasir.announcements.destroy');
     });
 
     Route::middleware(['role:karyawan'])->group(function () {

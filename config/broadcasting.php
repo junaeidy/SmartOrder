@@ -45,6 +45,9 @@ return [
             ],
             'client_options' => [
                 // Guzzle client options: https://docs.guzzlephp.org/en/stable/request-options.html
+                'timeout' => env('PUSHER_TIMEOUT', 5), // Reduce timeout to 5 seconds
+                'connect_timeout' => env('PUSHER_CONNECT_TIMEOUT', 3), // Connection timeout 3 seconds
+                'verify' => true,
             ],
         ],
 

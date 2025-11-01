@@ -19,11 +19,12 @@ class CancelExpiredTransactions extends Command
         $this->info('Checking for expired transactions...');
         
         try {
-            // Get transactions that are pending and created more than 15 minutes ago
+            // Get transactions that are pending and have expired based on payment_expires_at
             $expiredIds = Transaction::where('payment_method', 'midtrans')
                 ->where('payment_status', 'pending')
-                ->where('status', '!=', 'cancelled') // Pastikan belum dibatalkan
-                ->where('created_at', '<=', Carbon::now()->subMinutes(15))
+                ->where('status', '!=', 'cancelled')
+                ->whereNotNull('payment_expires_at')
+                ->where('payment_expires_at', '<=', Carbon::now())
                 ->pluck('id');
 
             if ($expiredIds->isEmpty()) {
@@ -50,7 +51,11 @@ class CancelExpiredTransactions extends Command
                         if ($transaction->payment_method !== 'midtrans') return;
                         if ($transaction->payment_status !== 'pending') return;
                         if ($transaction->status === 'cancelled') return;
-                        if (!Carbon::parse($transaction->created_at)->addMinutes(15)->isPast()) return;
+                        
+                        // Check if payment has expired using payment_expires_at
+                        if (!$transaction->payment_expires_at || !$transaction->payment_expires_at->isPast()) {
+                            return;
+                        }
 
                         // Try to expire on Midtrans (ignore failures, just log)
                         if (!empty($transaction->midtrans_transaction_id)) {

@@ -409,6 +409,24 @@ export default function Transaksi({ auth, transactions, history, storeSettings }
     setActionType('cancel');
     setShowConfirmModal(true);
   };
+  
+  // Handle Enter key press for confirmation modal
+  useEffect(() => {
+    const handleKeyPress = (e) => {
+      if (e.key === 'Enter' && showConfirmModal && actionTarget && !busyId) {
+        e.preventDefault();
+        performAction();
+      }
+    };
+    
+    if (showConfirmModal) {
+      window.addEventListener('keydown', handleKeyPress);
+    }
+    
+    return () => {
+      window.removeEventListener('keydown', handleKeyPress);
+    };
+  }, [showConfirmModal, actionTarget, busyId, cashReceived, actionType]);
   const performAction = () => {
     if (!actionTarget || !actionType) return;
     setBusyId(actionTarget.id);
@@ -597,6 +615,30 @@ export default function Transaksi({ auth, transactions, history, storeSettings }
     return date.toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
   };
 
+  // Calculate elapsed time from when order reached kasir (updated_at for awaiting_confirmation status)
+  // This timer starts from 0 when order enters kasir section
+  const calculateKasirElapsedTime = (transaction) => {
+    // Use updated_at as the start time since that's when it reached kasir (awaiting_confirmation)
+    const startTime = parseLaravelDate(transaction.updated_at) || parseLaravelDate(transaction.created_at);
+    if (!startTime) return '0:00';
+    
+    const now = currentTime;
+    const diffMs = now - startTime;
+    const diffSecs = Math.floor(diffMs / 1000);
+    const diffMins = Math.floor(diffSecs / 60);
+    const diffHours = Math.floor(diffMins / 60);
+    
+    if (diffMins < 1) {
+      return `${diffSecs}s`;
+    } else if (diffMins < 60) {
+      const secs = diffSecs % 60;
+      return `${diffMins}:${secs.toString().padStart(2, '0')}`;
+    } else {
+      const mins = diffMins % 60;
+      return `${diffHours}:${mins.toString().padStart(2, '0')}:${(diffSecs % 60).toString().padStart(2, '0')}`;
+    }
+  };
+
   return (
     <AuthenticatedLayout
       user={auth?.user}
@@ -703,14 +745,14 @@ export default function Transaksi({ auth, transactions, history, storeSettings }
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {rows.map((t) => (
-              <div key={t.id} className="bg-gray-800 rounded-lg shadow-md overflow-hidden border-l-4 border-orange-500 transition-all hover:shadow-lg cursor-pointer" onClick={() => openDetail(t)}>
+              <div key={t.id} className="bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden border-l-4 border-orange-500 transition-all hover:shadow-lg cursor-pointer" onClick={() => openDetail(t)}>
                 <div className="p-5">
                   <div className="flex justify-between items-center mb-3">
                     <div className="flex items-center">
                       <span className="bg-orange-500/20 text-orange-400 px-3 py-1.5 rounded text-base font-bold">#{t.queue_number}</span>
-                      <div className="flex items-center ml-2 bg-blue-900/30 px-2 py-1 rounded">
-                        <ClockIcon className="w-3 h-3 text-blue-300 mr-1" />
-                        <span className="text-xs text-blue-300">
+                      <div className="flex items-center ml-2 bg-blue-100 dark:bg-blue-900/30 px-2 py-1 rounded">
+                        <ClockIcon className="w-3 h-3 text-blue-600 dark:text-blue-300 mr-1" />
+                        <span className="text-xs text-blue-700 dark:text-blue-300">
                           {(() => {
                             const d = resolveTransactionDate(t);
                             return d ? d.toLocaleTimeString([], { hour: '2-digit', minute:'2-digit' }) : '-';
@@ -718,23 +760,28 @@ export default function Transaksi({ auth, transactions, history, storeSettings }
                         </span>
                       </div>
                     </div>
-                    <span className="text-xs text-gray-400">
+                    <span className="text-xs text-gray-500 dark:text-gray-400">
                       {(() => {
                         const d = resolveTransactionDate(t);
                         return d ? d.toLocaleDateString('id-ID', { year: 'numeric', month: 'short', day: 'numeric' }) : '-';
                       })()}
                     </span>
                   </div>
-                  <h3 className="font-bold text-lg mb-1">{t.customer_name}</h3>
-                  <p className="text-gray-400 text-sm mb-3">{t.customer_phone}</p>
+                  <h3 className="font-bold text-lg mb-1 text-gray-900 dark:text-white">{t.customer_name}</h3>
+                  <p className="text-gray-600 dark:text-gray-400 text-sm mb-3">{t.customer_phone}</p>
                   <div className="space-y-2 mb-4">
                     <div className="flex justify-between">
-                      <span className="text-gray-400">Items:</span>
-                      <span className="font-medium">{t.total_items}</span>
+                      <span className="text-gray-600 dark:text-gray-400">Items:</span>
+                      <span className="font-medium text-gray-900 dark:text-white">{t.total_items}</span>
                     </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-400">Total:</span>
-                      <span className="font-bold text-orange-400">{currencyIDR(t.total_amount)}</span>
+                    <div className="flex justify-between items-center">
+                      <span className="text-gray-600 dark:text-gray-400">Waktu:</span>
+                      <div className="flex items-center gap-1">
+                        <ClockIcon className="w-4 h-4 text-orange-500 animate-pulse" />
+                        <span className="font-bold text-orange-600 dark:text-orange-400 font-mono">
+                          {calculateKasirElapsedTime(t)}
+                        </span>
+                      </div>
                     </div>
                     <div className="flex items-center justify-between pt-1">
                       <div className="flex items-center space-x-2 text-xs">
@@ -860,7 +907,7 @@ export default function Transaksi({ auth, transactions, history, storeSettings }
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="text-sm">
                     <div className="text-gray-500 dark:text-gray-400">Tanggal</div>
-                    <div className="font-medium">
+                    <div className="font-medium text-gray-900 dark:text-gray-100">
                       {(() => {
                         const d = resolveTransactionDate(selected);
                         return d ? d.toLocaleString('id-ID', {
@@ -875,7 +922,7 @@ export default function Transaksi({ auth, transactions, history, storeSettings }
                   </div>
                   <div className="text-sm">
                     <div className="text-gray-500 dark:text-gray-400">Customer</div>
-                    <div className="font-medium">{selected.customer_name || '-'}</div>
+                    <div className="font-medium text-gray-900 dark:text-gray-100">{selected.customer_name || '-'}</div>
                     <div className="text-gray-500 dark:text-gray-400">{selected.customer_phone || '-'}</div>
                     <div className="text-gray-500 dark:text-gray-400">{selected.customer_email || '-'}</div>
                   </div>
@@ -888,7 +935,7 @@ export default function Transaksi({ auth, transactions, history, storeSettings }
                   </div>
                   <div className="text-sm">
                     <div className="text-gray-500 dark:text-gray-400">Antrian</div>
-                    <div className="font-medium">{selected.queue_number ?? '-'}</div>
+                    <div className="font-medium text-gray-900 dark:text-gray-100">{selected.queue_number ?? '-'}</div>
                   </div>
                   <div className="text-sm">
                     <div className="text-gray-500 dark:text-gray-400">Status Order</div>
@@ -896,7 +943,7 @@ export default function Transaksi({ auth, transactions, history, storeSettings }
                   </div>
                   <div className="text-sm sm:col-span-2">
                     <div className="text-gray-500 dark:text-gray-400">Catatan</div>
-                    <div className="font-medium whitespace-pre-wrap">{selected.customer_notes || '-'}</div>
+                    <div className="font-medium text-gray-900 dark:text-gray-100 whitespace-pre-wrap">{selected.customer_notes || '-'}</div>
                   </div>
                 </div>
 
@@ -924,10 +971,10 @@ export default function Transaksi({ auth, transactions, history, storeSettings }
                               const subtotal = it.subtotal ? parseFloat(String(it.subtotal)) : (qty * price);
                               return (
                                 <tr key={idx}>
-                                  <td className="px-3 py-2 text-sm">{name}</td>
-                                  <td className="px-3 py-2 text-sm text-right">{qty}</td>
-                                  <td className="px-3 py-2 text-sm text-right">{currencyIDR(price)}</td>
-                                  <td className="px-3 py-2 text-sm text-right">{currencyIDR(subtotal)}</td>
+                                  <td className="px-3 py-2 text-sm text-gray-900 dark:text-gray-100">{name}</td>
+                                  <td className="px-3 py-2 text-sm text-right text-gray-900 dark:text-gray-100">{qty}</td>
+                                  <td className="px-3 py-2 text-sm text-right text-gray-900 dark:text-gray-100">{currencyIDR(price)}</td>
+                                  <td className="px-3 py-2 text-sm text-right text-gray-900 dark:text-gray-100">{currencyIDR(subtotal)}</td>
                                 </tr>
                               );
                             })
@@ -992,15 +1039,15 @@ export default function Transaksi({ auth, transactions, history, storeSettings }
       </div>
       {/* Confirmation Modal */}
       <Modal show={showConfirmModal} onClose={() => setShowConfirmModal(false)} maxWidth="md">
-        <div className="p-6">
+        <div className="p-6 bg-white dark:bg-gray-900">
           <div className="flex items-center mb-4">
             <div className={`mx-auto flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full ${
-              actionType === 'confirm' ? 'bg-blue-100' : 'bg-red-100'
+              actionType === 'confirm' ? 'bg-blue-100 dark:bg-blue-900/30' : 'bg-red-100 dark:bg-red-900/30'
             }`}>
               {actionType === 'confirm' ? (
-                <CheckCircle className="h-8 w-8 text-blue-600" />
+                <CheckCircle className="h-8 w-8 text-blue-600 dark:text-blue-400" />
               ) : (
-                <XCircle className="h-8 w-8 text-red-600" />
+                <XCircle className="h-8 w-8 text-red-600 dark:text-red-400" />
               )}
             </div>
           </div>
@@ -1023,19 +1070,19 @@ export default function Transaksi({ auth, transactions, history, storeSettings }
                 <div className="space-y-2">
                   <div className="flex justify-between">
                     <span className="text-gray-600 dark:text-gray-400">Pelanggan:</span>
-                    <span className="font-medium">{actionTarget.customer_name}</span>
+                    <span className="font-medium text-gray-900 dark:text-gray-100">{actionTarget.customer_name}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-600 dark:text-gray-400">Total Items:</span>
-                    <span className="font-medium">{actionTarget.total_items}</span>
+                    <span className="font-medium text-gray-900 dark:text-gray-100">{actionTarget.total_items}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-600 dark:text-gray-400">Total:</span>
-                    <span className="font-medium">{currencyIDR(actionTarget.total_amount)}</span>
+                    <span className="font-medium text-gray-900 dark:text-gray-100">{currencyIDR(actionTarget.total_amount)}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-600 dark:text-gray-400">Pembayaran:</span>
-                    <span className="font-medium capitalize">{actionTarget.payment_method}</span>
+                    <span className="font-medium text-gray-900 dark:text-gray-100 capitalize">{actionTarget.payment_method}</span>
                   </div>
                   {actionTarget?.payment_method === 'cash' && actionType === 'confirm' && (
                     <>
@@ -1053,7 +1100,7 @@ export default function Transaksi({ auth, transactions, history, storeSettings }
                           className="w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 focus:border-indigo-500 focus:ring-indigo-500 text-sm px-3 py-2"
                           placeholder="Masukkan nominal uang..."
                         />
-                        {cashError && <p className="mt-1 text-xs text-red-500">{cashError}</p>}
+                        {cashError && <p className="mt-1 text-xs text-red-500 dark:text-red-400">{cashError}</p>}
                       </div>
                       {(() => {
                         const receivedNum = Number(String(cashReceived).replace(/[^\d.-]/g, ''));
@@ -1063,7 +1110,7 @@ export default function Transaksi({ auth, transactions, history, storeSettings }
                         return (
                           <div className="flex justify-between mt-2">
                             <span className="text-gray-600 dark:text-gray-400">Kembalian:</span>
-                            <span className={`font-semibold ${valid && receivedNum >= totalNum ? 'text-green-600' : 'text-gray-400'}`}>
+                            <span className={`font-semibold ${valid && receivedNum >= totalNum ? 'text-green-600 dark:text-green-400' : 'text-gray-400 dark:text-gray-500'}`}>
                               {currencyIDR(change)}
                             </span>
                           </div>
@@ -1102,10 +1149,10 @@ export default function Transaksi({ auth, transactions, history, storeSettings }
 
       {/* Success Modal */}
       <Modal show={showSuccessModal} onClose={() => setShowSuccessModal(false)} maxWidth="md">
-        <div className="p-6">
+        <div className="p-6 bg-white dark:bg-gray-900">
           <div className="flex items-center justify-center mb-4">
-            <div className="mx-auto flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-green-100">
-              <CheckCircle className="h-8 w-8 text-green-600" />
+            <div className="mx-auto flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-green-100 dark:bg-green-900/30">
+              <CheckCircle className="h-8 w-8 text-green-600 dark:text-green-400" />
             </div>
           </div>
           <div className="mt-3 text-center sm:mt-5">
@@ -1123,31 +1170,31 @@ export default function Transaksi({ auth, transactions, history, storeSettings }
               <div className="space-y-2">
                 <div className="flex justify-between">
                   <span className="text-gray-600 dark:text-gray-400">Pelanggan:</span>
-                  <span className="font-medium">{processedOrder?.customer_name}</span>
+                  <span className="font-medium text-gray-900 dark:text-gray-100">{processedOrder?.customer_name}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-600 dark:text-gray-400">Total Items:</span>
-                  <span className="font-medium">{processedOrder?.total_items}</span>
+                  <span className="font-medium text-gray-900 dark:text-gray-100">{processedOrder?.total_items}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-600 dark:text-gray-400">Total:</span>
-                  <span className="font-medium text-green-600">{currencyIDR(processedOrder?.total_amount)}</span>
+                  <span className="font-medium text-green-600 dark:text-green-400">{currencyIDR(processedOrder?.total_amount)}</span>
                 </div>
                 {processedOrder?.payment_method === 'cash' && (
                   <>
                     <div className="flex justify-between">
                       <span className="text-gray-600 dark:text-gray-400">Tunai:</span>
-                      <span className="font-medium">{currencyIDR(processedOrder?.amount_received ?? cashReceived)}</span>
+                      <span className="font-medium text-gray-900 dark:text-gray-100">{currencyIDR(processedOrder?.amount_received ?? cashReceived)}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-gray-600 dark:text-gray-400">Kembalian:</span>
-                      <span className="font-medium">{currencyIDR((processedOrder?.change_amount) ?? (Number(cashReceived || 0) - Number(processedOrder?.total_amount || 0)))}</span>
+                      <span className="font-medium text-gray-900 dark:text-gray-100">{currencyIDR((processedOrder?.change_amount) ?? (Number(cashReceived || 0) - Number(processedOrder?.total_amount || 0)))}</span>
                     </div>
                   </>
                 )}
                 <div className="flex justify-between">
                   <span className="text-gray-600 dark:text-gray-400">Pembayaran:</span>
-                  <span className="font-medium capitalize">{processedOrder?.payment_method}</span>
+                  <span className="font-medium text-gray-900 dark:text-gray-100 capitalize">{processedOrder?.payment_method}</span>
                 </div>
               </div>
             </div>
@@ -1181,7 +1228,7 @@ export default function Transaksi({ auth, transactions, history, storeSettings }
 
       {/* Confirm/Cancel Action Modal */}
       <Modal show={showActionModal} onClose={() => setShowActionModal(false)} maxWidth="md">
-        <div className="p-5">
+        <div className="p-5 bg-white dark:bg-gray-900">
           <div className="flex items-start justify-between mb-3">
             <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
               {actionType === 'cancel' ? 'Batalkan Pesanan' : 'Konfirmasi Pesanan'}
@@ -1190,26 +1237,26 @@ export default function Transaksi({ auth, transactions, history, storeSettings }
           </div>
           <p className="text-gray-600 dark:text-gray-300 mb-4">
             {actionType === 'cancel' ? (
-              <>Anda yakin ingin membatalkan pesanan #{actionTarget?.queue_number} milik <span className="font-medium">{actionTarget?.customer_name}</span>? Stok akan dikembalikan.</>
+              <>Anda yakin ingin membatalkan pesanan #{actionTarget?.queue_number} milik <span className="font-medium text-gray-900 dark:text-gray-100">{actionTarget?.customer_name}</span>? Stok akan dikembalikan.</>
             ) : (
-              <>Konfirmasi pesanan #{actionTarget?.queue_number} milik <span className="font-medium">{actionTarget?.customer_name}</span>? {actionTarget?.payment_method === 'cash' ? 'Pembayaran akan ditandai sebagai Lunas.' : ''}</>
+              <>Konfirmasi pesanan #{actionTarget?.queue_number} milik <span className="font-medium text-gray-900 dark:text-gray-100">{actionTarget?.customer_name}</span>? {actionTarget?.payment_method === 'cash' ? 'Pembayaran akan ditandai sebagai Lunas.' : ''}</>
             )}
           </p>
           {actionTarget && (
             <div className="bg-gray-50 dark:bg-gray-800 rounded-md p-3 border border-gray-200 dark:border-gray-700 mb-4 text-sm">
               <div className="flex justify-between">
-                <span className="text-gray-500">Items</span>
-                <span className="font-medium">{actionTarget.total_items}</span>
+                <span className="text-gray-500 dark:text-gray-400">Items</span>
+                <span className="font-medium text-gray-900 dark:text-gray-100">{actionTarget.total_items}</span>
               </div>
               <div className="flex justify-between mt-1">
-                <span className="text-gray-500">Total</span>
-                <span className="font-semibold text-orange-500">{currencyIDR(actionTarget.total_amount)}</span>
+                <span className="text-gray-500 dark:text-gray-400">Total</span>
+                <span className="font-semibold text-orange-500 dark:text-orange-400">{currencyIDR(actionTarget.total_amount)}</span>
               </div>
             </div>
           )}
           <div className="flex justify-end space-x-2">
             <button onClick={() => setShowActionModal(false)} className="px-4 py-2 rounded-md bg-gray-200 text-gray-800 hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-100 dark:hover:bg-gray-600 text-sm font-medium">Batal</button>
-            <button onClick={performAction} disabled={busyId===actionTarget?.id} className={`inline-flex items-center px-4 py-2 rounded-md text-white text-sm font-medium ${actionType==='cancel' ? 'bg-red-600 hover:bg-red-700' : 'bg-green-600 hover:bg-green-700'} disabled:opacity-60`}>
+            <button onClick={performAction} disabled={busyId===actionTarget?.id} className={`inline-flex items-center px-4 py-2 rounded-md text-white text-sm font-medium ${actionType==='cancel' ? 'bg-red-600 hover:bg-red-700 dark:bg-red-700 dark:hover:bg-red-800' : 'bg-green-600 hover:bg-green-700 dark:bg-green-700 dark:hover:bg-green-800'} disabled:opacity-60`}>
               {actionType==='cancel' ? 'Ya, Batalkan' : 'Ya, Konfirmasi'}
             </button>
           </div>

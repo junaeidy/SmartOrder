@@ -25,6 +25,8 @@ class DiscountController extends Controller
             'requires_code' => 'boolean',
             'valid_from' => 'nullable|date',
             'valid_until' => 'nullable|date|after_or_equal:valid_from',
+            'time_from' => 'nullable|date_format:H:i',
+            'time_until' => 'nullable|date_format:H:i',
         ]);
         
         \App\Models\Discount::create([
@@ -37,6 +39,8 @@ class DiscountController extends Controller
             'requires_code' => $request->boolean('requires_code', true),
             'valid_from' => $request->input('valid_from'),
             'valid_until' => $request->input('valid_until'),
+            'time_from' => $request->input('time_from'),
+            'time_until' => $request->input('time_until'),
         ]);
         
         return redirect()->back()->with('success', 'Diskon berhasil ditambahkan');
@@ -63,6 +67,8 @@ class DiscountController extends Controller
             'requires_code' => 'boolean',
             'valid_from' => 'nullable|date',
             'valid_until' => 'nullable|date|after_or_equal:valid_from',
+            'time_from' => 'nullable|date_format:H:i',
+            'time_until' => 'nullable|date_format:H:i',
         ]);
         
         $discount->update([
@@ -75,6 +81,8 @@ class DiscountController extends Controller
             'requires_code' => $request->boolean('requires_code', true),
             'valid_from' => $request->input('valid_from'),
             'valid_until' => $request->input('valid_until'),
+            'time_from' => $request->input('time_from'),
+            'time_until' => $request->input('time_until'),
         ]);
         
         return redirect()->back()->with('success', 'Diskon berhasil diperbarui');

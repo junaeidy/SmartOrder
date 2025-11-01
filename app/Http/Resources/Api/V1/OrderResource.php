@@ -27,6 +27,7 @@ class OrderResource extends JsonResource
             'tax_amount' => $this->tax_amount,
             'payment_method' => $this->payment_method,
             'payment_status' => $this->payment_status,
+            'payment_expires_at' => $this->when($this->payment_expires_at, $this->payment_expires_at?->toIso8601String()),
             'midtrans_payment_url' => $this->when($this->midtrans_payment_url, $this->midtrans_payment_url),
             'queue_number' => $this->queue_number,
             'status' => $this->status,

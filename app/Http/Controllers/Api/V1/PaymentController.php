@@ -69,6 +69,9 @@ class PaymentController extends Controller
             if ($shouldNotify) {
                 // Notify the system that a new order has been paid (broadcast to UI)
                 event(new \App\Events\NewOrderReceived($transaction));
+                
+                // Send push notification to customer
+                event(new \App\Events\OrderStatusChanged($transaction));
 
                 // Send email confirmation synchronously (idempotent)
                 try {
@@ -129,6 +132,10 @@ class PaymentController extends Controller
                 }
                 if ($shouldNotify) {
                     event(new \App\Events\NewOrderReceived($transaction));
+                    
+                    // Send push notification to customer
+                    event(new \App\Events\OrderStatusChanged($transaction));
+                    
                     try {
                         Mail::to($transaction->customer_email)->send(new OrderConfirmation($transaction));
                         $transaction->confirmation_email_sent_at = now();

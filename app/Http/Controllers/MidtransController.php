@@ -8,6 +8,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use App\Mail\OrderConfirmation;
+use App\Helpers\BroadcastHelper;
 
 class MidtransController extends Controller
 {
@@ -102,7 +103,7 @@ class MidtransController extends Controller
 
             if ($shouldNotify) {
                 // Notify the system that a new order has been paid (broadcast to UI)
-                event(new \App\Events\NewOrderReceived($transaction));
+                BroadcastHelper::safeBroadcast(new \App\Events\NewOrderReceived($transaction));
 
                 // Send email confirmation synchronously (idempotent)
                 try {
@@ -170,7 +171,7 @@ class MidtransController extends Controller
                     }
                     if (empty($transaction->confirmation_email_sent_at)) {
                         // First time confirmation: broadcast and email
-                        event(new \App\Events\NewOrderReceived($transaction));
+                        BroadcastHelper::safeBroadcast(new \App\Events\NewOrderReceived($transaction));
                         try {
                             Mail::to($transaction->customer_email)->send(new OrderConfirmation($transaction));
                             $transaction->confirmation_email_sent_at = now();
@@ -276,7 +277,7 @@ class MidtransController extends Controller
                 // Notify system about new paid order (broadcast to UI) only once
                 $shouldNotify = empty($transaction->confirmation_email_sent_at);
                 if ($shouldNotify) {
-                    event(new \App\Events\NewOrderReceived($transaction));
+                    BroadcastHelper::safeBroadcast(new \App\Events\NewOrderReceived($transaction));
                     // Fallback: email only if not sent yet
                     if (empty($transaction->confirmation_email_sent_at)) {
                         try {

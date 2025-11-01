@@ -8,6 +8,7 @@ use App\Models\Setting;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Carbon\Carbon;
+use App\Helpers\BroadcastHelper;
 
 class KasirTransactionController extends Controller
 {
@@ -118,7 +119,7 @@ class KasirTransactionController extends Controller
         $transaction->status = 'completed';
         $transaction->save();
 
-        event(new \App\Events\OrderStatusChanged($transaction));
+        BroadcastHelper::safeBroadcast(new \App\Events\OrderStatusChanged($transaction));
 
         return back()->with('success', 'Transaksi dikonfirmasi selesai.');
     }
@@ -153,7 +154,7 @@ class KasirTransactionController extends Controller
     $transaction->paid_at = null;
         $transaction->save();
 
-        event(new \App\Events\OrderStatusChanged($transaction));
+        BroadcastHelper::safeBroadcast(new \App\Events\OrderStatusChanged($transaction));
 
         return back()->with('success', 'Transaksi dibatalkan dan stok dikembalikan.');
     }
