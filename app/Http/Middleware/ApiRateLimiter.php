@@ -135,10 +135,10 @@ class ApiRateLimiter
 
         return response()->json([
             'success' => false,
-            'message' => 'Terlalu banyak request. Silakan coba lagi nanti.',
+            'message' => 'Terlalu banyak percobaan. Silakan coba lagi nanti.',
             'errors' => [
                 'rate_limit' => [
-                    'Anda telah mencapai batas maksimal request.',
+                    'Anda telah mencapai batas maksimal percobaan.',
                     'Silakan tunggu ' . $this->formatRetryAfter($retryAfter) . ' sebelum mencoba lagi.'
                 ]
             ],

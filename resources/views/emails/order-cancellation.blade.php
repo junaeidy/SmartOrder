@@ -62,8 +62,8 @@
                 <div class="customer-detail"><span class="label">Nama:</span> <span>{{ $transaction->customer_name }}</span></div>
                 <div class="customer-detail"><span class="label">Email:</span> <span>{{ $transaction->customer_email }}</span></div>
                 <div class="customer-detail"><span class="label">Telepon:</span> <span>{{ $transaction->customer_phone }}</span></div>
-                <div class="customer-detail"><span class="label">Tanggal Pesan:</span> <span>{{ optional($transaction->created_at)->format('F j, Y, g:i a') }}</span></div>
-                <div class="customer-detail"><span class="label">Metode Bayar:</span> <span>{{ ucfirst($transaction->payment_method) }}</span></div>
+                <div class="customer-detail"><span class="label">Tanggal Pesan:</span> <span>{{ optional($transaction->created_at)->format('j F Y, H:i') }}</span></div>
+                <div class="customer-detail"><span class="label">Metode Pembayaran:</span> <span>{{ $transaction->payment_method == 'cash' ? 'Tunai' : 'Online' }}</span></div>
             </div>
 
             <div class="order-details">

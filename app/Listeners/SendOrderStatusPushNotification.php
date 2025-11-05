@@ -84,12 +84,14 @@ class SendOrderStatusPushNotification implements ShouldQueue
             $this->firebaseService->sendOrderStatusNotification(
                 $fcmToken,
                 (string) $transaction->id,
-                $transaction->status
+                $transaction->status,
+                $transaction->payment_method // Pass payment method
             );
 
             Log::info('Order status push notification sent', [
                 'transaction_id' => $transaction->id,
                 'status' => $transaction->status,
+                'payment_method' => $transaction->payment_method,
                 'customer_id' => $transaction->customer->id,
             ]);
         } catch (\Exception $e) {

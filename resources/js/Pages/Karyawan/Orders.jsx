@@ -421,7 +421,7 @@ const Orders = ({ pendingOrders, completedOrders, auth }) => {
                     {activeTab === 'pending' && (
                         <>
                             <div className="mb-2 flex justify-between items-center">
-                                <h2 className="text-xl font-semibold">Pesanan Tertunda</h2>
+                                <h2 className="text-xl font-semibold dark:text-white">Pesanan Tertunda</h2>
                                 <span className="bg-orange-500 px-3 py-1 rounded-full text-sm font-medium">
                                     {orders.length} Antrian
                                 </span>

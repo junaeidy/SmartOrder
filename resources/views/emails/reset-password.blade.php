@@ -79,11 +79,11 @@
     <div class="container">
         <div class="header">
             <div class="logo">SmartOrder</div>
-            <h1 class="title">Reset Password Code</h1>
+            <h1 class="title">Kode Reset Password</h1>
         </div>
 
         <p style="text-align: center; color: #4a5568;">
-            We received a request to reset your password. Use the code below to proceed:
+            Kami menerima permintaan untuk mereset password Anda. Gunakan kode di bawah ini untuk melanjutkan:
         </p>
 
         <div class="code-container">
@@ -91,20 +91,20 @@
         </div>
 
         <div class="expiry">
-            ⏰ This code will expire in 60 minutes
+            ⏰ Kode ini akan kedaluwarsa dalam 60 menit
         </div>
 
         <p style="text-align: center; color: #4a5568;">
-            Enter this code in the app to reset your password and regain access to your account.
+            Masukkan kode ini di aplikasi untuk mereset password Anda dan mendapatkan kembali akses ke akun Anda.
         </p>
 
         <div class="warning">
-            If you didn't request this password reset, you can safely ignore this email. Someone might have typed your email address by mistake.
+            Jika Anda tidak meminta reset password ini, Anda dapat mengabaikan email ini. Mungkin seseorang secara tidak sengaja mengetikkan alamat email Anda.
         </div>
 
         <div class="footer">
             &copy; {{ date('Y') }} SmartOrder. All rights reserved.<br>
-            This is an automated message, please do not reply.
+            Ini adalah pesan otomatis, mohon jangan membalas email ini.
         </div>
     </div>
 </body>

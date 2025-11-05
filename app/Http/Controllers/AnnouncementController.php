@@ -4,9 +4,11 @@ namespace App\Http\Controllers;
 
 use App\Models\Announcement;
 use App\Services\FirebaseService;
+use App\Jobs\ProcessAnnouncementBroadcast;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 
 class AnnouncementController extends Controller
 {
@@ -76,38 +78,23 @@ class AnnouncementController extends Controller
             return redirect()->back()->with('error', 'Pengumuman ini sudah dikirim sebelumnya.');
         }
 
-        // Update status to sending
-        $announcement->update(['status' => 'sending']);
+        // Check if already in sending process
+        if ($announcement->status === 'sending') {
+            return redirect()->back()->with('error', 'Pengumuman ini sedang dalam proses pengiriman.');
+        }
 
         try {
-            // Send to all customers with FCM tokens
-            $result = $this->firebaseService->sendAnnouncementToAllCustomers(
-                $announcement->title,
-                $announcement->message,
-                $announcement->id
-            );
+            // Dispatch job to process announcement broadcast
+            ProcessAnnouncementBroadcast::dispatch($announcement->id);
 
-            // Update announcement with results
-            $announcement->update([
-                'status' => 'sent',
-                'sent_at' => now(),
-                'recipients_count' => $result['total'],
-                'success_count' => $result['success'],
-                'failed_count' => $result['failed'],
+            return redirect()->back()->with('success', 'Pengumuman sedang diproses dan akan dikirim ke semua customer. Proses ini berjalan di background.');
+        } catch (\Exception $e) {
+            Log::error('Failed to dispatch announcement broadcast', [
+                'announcement_id' => $announcement->id,
+                'error' => $e->getMessage(),
             ]);
 
-            $message = "Pengumuman berhasil dikirim ke {$result['success']} dari {$result['total']} penerima.";
-            
-            if ($result['failed'] > 0) {
-                $message .= " {$result['failed']} gagal dikirim.";
-            }
-
-            return redirect()->back()->with('success', $message);
-        } catch (\Exception $e) {
-            // Update status to failed
-            $announcement->update(['status' => 'failed']);
-
-            return redirect()->back()->with('error', 'Gagal mengirim pengumuman: ' . $e->getMessage());
+            return redirect()->back()->with('error', 'Gagal memproses pengumuman: ' . $e->getMessage());
         }
     }
 

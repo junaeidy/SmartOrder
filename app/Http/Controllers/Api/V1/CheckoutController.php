@@ -10,6 +10,7 @@ use App\Models\QueueCounter;
 use App\Models\Transaction;
 use App\Services\MidtransService;
 use App\Services\DuplicateOrderProtectionService;
+use App\Helpers\SecurityHelper;
 use Carbon\Carbon;
 use App\Events\NewOrderReceived;
 use App\Events\ProductStockAlert;
@@ -173,7 +174,7 @@ class CheckoutController extends Controller
             'customer_email' => $customer->email,
             'items' => $cartItems,
             'payment_method' => $request->paymentMethod,
-            'customer_notes' => $request->orderNotes,
+            'customer_notes' => SecurityHelper::sanitizeInput($request->orderNotes, 500),
             'discount_id' => $request->discountId,
         ];
         
@@ -285,10 +286,10 @@ class CheckoutController extends Controller
                 // Create transaction record
                 $transaction = Transaction::create([
                     'kode_transaksi' => $kodeTransaksi,
-                    'customer_name' => $customer->name,
+                    'customer_name' => SecurityHelper::sanitizeName($customer->name),
                     'customer_email' => $customer->email,
                     'customer_phone' => $customer->phone,
-                    'customer_notes' => $request->orderNotes ?? null,
+                    'customer_notes' => SecurityHelper::sanitizeInput($request->orderNotes, 500),
                     'order_hash' => $orderHash,
                     'last_attempt_at' => Carbon::now(),
                     'idempotency_key' => $idempotencyKey,
@@ -395,9 +396,29 @@ class CheckoutController extends Controller
     public function history(Request $request)
     {
         $customer = $request->user();
-        $transactions = Transaction::where('customer_email', $customer->email)
-            ->orderBy('created_at', 'desc')
-            ->paginate(10);
+        
+        // Validate status filter
+        $request->validate([
+            'status' => 'nullable|string|in:all,waiting_for_payment,waiting,awaiting_confirmation,completed,cancelled',
+            'page' => 'nullable|integer|min:1',
+            'per_page' => 'nullable|integer|min:1|max:50'
+        ]);
+        
+        $status = $request->input('status', 'all');
+        $perPage = $request->input('per_page', 10);
+        
+        // Build query with eager loading to prevent N+1
+        $query = Transaction::with('discount')
+            ->where('customer_email', $customer->email);
+        
+        // Apply status filter
+        if ($status !== 'all') {
+            $query->where('status', $status);
+        }
+        
+        // Get transactions with pagination
+        $transactions = $query->orderBy('created_at', 'desc')
+            ->paginate($perPage);
         
         return response()->json([
             'success' => true,
@@ -408,6 +429,56 @@ class CheckoutController extends Controller
                     'last_page' => $transactions->lastPage(),
                     'per_page' => $transactions->perPage(),
                     'total' => $transactions->total()
+                ],
+                'filter' => [
+                    'status' => $status
+                ]
+            ]
+        ]);
+    }
+    
+    /**
+     * Get order statistics/counts by status for the authenticated customer
+     * 
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function orderStats(Request $request)
+    {
+        $customer = $request->user();
+        
+        // Get counts for each status
+        $stats = Transaction::where('customer_email', $customer->email)
+            ->select('status', DB::raw('count(*) as count'))
+            ->groupBy('status')
+            ->get()
+            ->pluck('count', 'status')
+            ->toArray();
+        
+        // Get total count
+        $totalCount = Transaction::where('customer_email', $customer->email)->count();
+        
+        // Ensure all statuses are present in the response (even if count is 0)
+        $allStats = [
+            'all' => $totalCount,
+            'waiting_for_payment' => $stats['waiting_for_payment'] ?? 0,
+            'waiting' => $stats['waiting'] ?? 0,
+            'awaiting_confirmation' => $stats['awaiting_confirmation'] ?? 0,
+            'completed' => $stats['completed'] ?? 0,
+            'cancelled' => $stats['cancelled'] ?? 0,
+        ];
+        
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'stats' => $allStats,
+                'labels' => [
+                    'all' => 'Semua',
+                    'waiting_for_payment' => 'Menunggu Pembayaran',
+                    'waiting' => 'Diproses',
+                    'awaiting_confirmation' => 'Siap Diambil',
+                    'completed' => 'Selesai',
+                    'cancelled' => 'Dibatalkan',
                 ]
             ]
         ]);

@@ -11,7 +11,7 @@ class ProductPolicy
     /**
      * Determine if the given product can be viewed by the user.
      */
-    public function view(?Customer $customer, Product $product): bool
+    public function view(User|Customer|null $user, Product $product): bool
     {
         // Everyone can view products (public)
         return true;
@@ -20,7 +20,7 @@ class ProductPolicy
     /**
      * Determine if the user can view any products.
      */
-    public function viewAny(?Customer $customer): bool
+    public function viewAny(User|Customer|null $user): bool
     {
         // Everyone can view products list (public)
         return true;

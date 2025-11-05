@@ -171,20 +171,28 @@ class FirebaseService
      * @param string $fcmToken
      * @param string $orderId
      * @param string $status
+     * @param string|null $paymentMethod Optional payment method (tunai, online, etc.)
      * @return bool
      */
-    public function sendOrderStatusNotification(string $fcmToken, string $orderId, string $status): bool
+    public function sendOrderStatusNotification(string $fcmToken, string $orderId, string $status, ?string $paymentMethod = null): bool
     {
         $statusMessages = [
             'waiting_for_payment' => 'Pesanan berhasil dibuat! Silakan selesaikan pembayaran Anda.',
             'waiting' => 'Pembayaran berhasil! Pesanan Anda sedang diproses.',
+            'waiting_cash' => 'Pesanan berhasil dibuat! Silakan menunggu.',
             'awaiting_confirmation' => 'Pesanan Anda siap diambil!',
             'completed' => 'Pesanan Anda telah selesai. Terima kasih!',
             'cancelled' => 'Pesanan Anda dibatalkan.',
         ];
 
+        // Adjust message for tunai payment on 'waiting' status
+        if ($status === 'waiting' && $paymentMethod === 'cash') {
+            $body = $statusMessages['waiting_cash'];
+        } else {
+            $body = $statusMessages[$status] ?? 'Status pesanan Anda berubah';
+        }
+
         $title = 'Status Pesanan';
-        $body = $statusMessages[$status] ?? 'Status pesanan Anda berubah';
 
         return $this->sendNotification($fcmToken, $title, $body, [
             'type' => 'order_status',

@@ -200,7 +200,7 @@ class MidtransController extends Controller
                 return response()->json([
                     'success' => false,
                     'transaction' => $transaction,
-                    'message' => $response['message'] ?? 'Failed to check transaction status with payment gateway'
+                    'message' => $response['message'] ?? 'Gagal mengecek status transaksi dengan gateway pembayaran'
                 ], 200); // Return 200 since we found the transaction in our database
             }
         } catch (\Exception $e) {
@@ -213,7 +213,7 @@ class MidtransController extends Controller
             
             return response()->json([
                 'success' => false,
-                'message' => 'An error occurred while checking payment status'
+                'message' => 'Terjadi kesalahan saat mengecek status pembayaran'
             ], 500);
         }
     }
@@ -296,13 +296,13 @@ class MidtransController extends Controller
                 
                 Log::info('Payment successful for order: ' . $internalOrderId);
                 return redirect()->route('checkout.thankyou', $transaction->id)
-                    ->with('success', 'Payment successful! Your order is being processed.');
+                    ->with('success', 'Pembayaran berhasil! Pesanan Anda sedang diproses.');
             }
             
             // Payment might be pending or failed
             Log::info('Payment not yet confirmed for order: ' . $internalOrderId);
             return redirect()->route('checkout.thankyou', $transaction->id)
-                ->with('warning', 'We are confirming your payment. Please check order status later.');
+                ->with('warning', 'Kami sedang mengkonfirmasi pembayaran Anda. Silakan cek status pesanan nanti.');
             
         } catch (\Exception $e) {
             Log::error('Error in finish callback: ' . $e->getMessage(), [

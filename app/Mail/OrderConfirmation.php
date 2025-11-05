@@ -29,7 +29,7 @@ class OrderConfirmation extends Mailable
     public function envelope(): Envelope
     {
         return new Envelope(
-            subject: 'Your SmartOrder Receipt - Order #' . $this->transaction->queue_number,
+            subject: 'Struk SmartOrder Anda - Pesanan #' . $this->transaction->queue_number,
         );
     }
 

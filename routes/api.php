@@ -71,6 +71,7 @@ Route::prefix('v1')->group(function () {
     // Orders History
     Route::middleware(['auth:sanctum', 'device.token'])->group(function () {
         Route::get('/orders/history', [CheckoutController::class, 'history']);
+        Route::get('/orders/stats', [CheckoutController::class, 'orderStats']);
         Route::get('/orders/{transaction}', [CheckoutController::class, 'show']);
     });
     

@@ -71,6 +71,6 @@ class KaryawanOrderController extends Controller
         // Broadcast status change for realtime dashboards
         BroadcastHelper::safeBroadcast(new \App\Events\OrderStatusChanged($transaction));
 
-        return back()->with('success', 'Order has been processed successfully');
+        return back()->with('success', 'Pesanan berhasil diproses');
     }
 }
