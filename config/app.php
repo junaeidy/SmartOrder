@@ -123,4 +123,17 @@ return [
         'store' => env('APP_MAINTENANCE_STORE', 'database'),
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Webhook API Key
+    |--------------------------------------------------------------------------
+    |
+    | This key is used to secure webhook endpoints (payment notifications, etc).
+    | Generate a secure random key and add to .env: WEBHOOK_API_KEY=your_key
+    | Use php artisan tinker: \App\Helpers\SecurityHelper::generateApiKey()
+    |
+    */
+
+    'webhook_api_key' => env('WEBHOOK_API_KEY'),
+
 ];

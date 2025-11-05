@@ -60,7 +60,11 @@ class PaymentController extends Controller
     if ($response["success"] && isset($response['transaction']) && $response['transaction']->payment_status == 'paid') {
             // If payment is successful, ensure status is 'waiting' and notify
             $transaction = $response['transaction'];
+            
+            // Check if we should send notifications (email + push)
+            // Use confirmation_email_sent_at as flag to prevent duplicate notifications
             $shouldNotify = empty($transaction->confirmation_email_sent_at);
+            
             if ($transaction->status !== 'waiting') {
                 $transaction->status = 'waiting';
                 $transaction->save();
@@ -70,20 +74,21 @@ class PaymentController extends Controller
                 // Notify the system that a new order has been paid (broadcast to UI)
                 event(new \App\Events\NewOrderReceived($transaction));
                 
-                // Send push notification to customer
+                // Send push notification to customer (only once!)
                 event(new \App\Events\OrderStatusChanged($transaction));
 
                 // Send email confirmation synchronously (idempotent)
                 try {
                     Mail::to($transaction->customer_email)->send(new OrderConfirmation($transaction));
+                    // Set flag to prevent duplicate notifications
                     $transaction->confirmation_email_sent_at = now();
                     $transaction->save();
-                    Log::info('Order confirmation email sent for transaction: ' . $transaction->kode_transaksi);
+                    Log::info('Order confirmation email + push notification sent for transaction: ' . $transaction->kode_transaksi);
                 } catch (\Exception $e) {
                     Log::error('Error sending order confirmation email: ' . $e->getMessage());
                 }
             } else {
-                Log::info('Email already sent previously, skip duplicate send for: ' . $transaction->kode_transaksi);
+                Log::info('Notifications already sent previously, skip duplicate for: ' . $transaction->kode_transaksi);
             }
 
             Log::info('Ensured transaction status waiting and triggered event: ' . $transaction->kode_transaksi);
@@ -165,7 +170,7 @@ class PaymentController extends Controller
             Log::error('Error checking payment status: ' . $e->getMessage());
             return response()->json([
                 'success' => false,
-                'message' => 'Error checking payment status: ' . $e->getMessage()
+                'message' => 'Gagal mengecek status pembayaran: ' . $e->getMessage()
             ], 500);
         }
     }
@@ -178,7 +183,7 @@ class PaymentController extends Controller
         // This endpoint is needed for the mobile app to redirect back after payment
         return response()->json([
             'success' => true,
-            'message' => 'Payment process completed'
+            'message' => 'Proses pembayaran selesai'
         ]);
     }
 

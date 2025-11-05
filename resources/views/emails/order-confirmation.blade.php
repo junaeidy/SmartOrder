@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="id">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Order Confirmation</title>
+    <title>Konfirmasi Pesanan</title>
     <style>
         /* Reset styles */
         body {
@@ -169,14 +169,14 @@
     <div class="container">
         <div class="header">
             <h1>SmartOrder</h1>
-            <p>Order Confirmation</p>
+            <p>Konfirmasi Pesanan</p>
         </div>
         
         <div class="content">
             <div class="customer-details">
-                <h2>Customer Details</h2>
+                <h2>Detail Pelanggan</h2>
                 <div class="customer-detail">
-                    <span class="label">Name:</span>
+                    <span class="label">Nama:</span>
                     <span>{{ $transaction->customer_name }}</span>
                 </div>
                 <div class="customer-detail">
@@ -184,27 +184,27 @@
                     <span>{{ $transaction->customer_email }}</span>
                 </div>
                 <div class="customer-detail">
-                    <span class="label">Phone:</span>
+                    <span class="label">Telepon:</span>
                     <span>{{ $transaction->customer_phone }}</span>
                 </div>
                 <div class="customer-detail">
-                    <span class="label">Order Date:</span>
-                    <span>{{ $transaction->created_at->format('F j, Y, g:i a') }}</span>
+                    <span class="label">Tanggal Pesan:</span>
+                    <span>{{ $transaction->created_at->format('j F Y, H:i') }}</span>
                 </div>
                 <div class="customer-detail">
-                    <span class="label">Payment Method:</span>
-                    <span>{{ ucfirst($transaction->payment_method) }}</span>
+                    <span class="label">Metode Pembayaran:</span>
+                    <span>{{ $transaction->payment_method == 'cash' ? 'Tunai' : 'Online' }}</span>
                 </div>
             </div>
             
             <div class="order-details">
-                <h2>Order Details</h2>
+                <h2>Detail Pesanan</h2>
                 <table>
                     <thead>
                         <tr>
                             <th>Item</th>
-                            <th>Quantity</th>
-                            <th>Price</th>
+                            <th>Jumlah</th>
+                            <th>Harga</th>
                             <th>Total</th>
                         </tr>
                     </thead>
@@ -228,7 +228,7 @@
                     </tbody>
                     <tfoot>
                         <tr>
-                            <td colspan="3" class="summary-label muted">Total Items</td>
+                            <td colspan="3" class="summary-label muted">Total Item</td>
                             <td class="summary-value">{{ $transaction->total_items }}</td>
                         </tr>
                         <tr>
@@ -254,20 +254,20 @@
             </div>
             
             <div class="queue-number">
-                <h2>Your Queue Number</h2>
+                <h2>Nomor Antrian Anda</h2>
                 <div class="number">{{ $transaction->queue_number }}</div>
-                <p>Please present this number when collecting your order</p>
+                <p>Harap tunjukkan nomor ini saat mengambil pesanan Anda</p>
             </div>
             
             <div class="thanks">
-                <h2>Thank You for Your Order!</h2>
-                <p>Your order has been received and will be processed by our staff shortly. We appreciate your business and hope to serve you again soon.</p>
+                <h2>Terima Kasih atas Pesanan Anda!</h2>
+                <p>Pesanan Anda telah diterima dan akan segera diproses oleh staf kami. Kami sangat menghargai kepercayaan Anda dan berharap dapat melayani Anda lagi.</p>
             </div>
         </div>
         
         <div class="footer">
             <p>&copy; {{ date('Y') }} SmartOrder. All rights reserved.</p>
-            <p>If you have any questions, please contact our customer service.</p>
+            <p>Jika Anda memiliki pertanyaan, silakan hubungi layanan pelanggan kami.</p>
         </div>
     </div>
 </body>

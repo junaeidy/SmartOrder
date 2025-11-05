@@ -9,6 +9,7 @@ use App\Models\Setting;
 use App\Models\FavoriteMenu;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cache;
 
 class ProductController extends Controller
 {
@@ -19,21 +20,31 @@ class ProductController extends Controller
      */
     public function index()
     {
-        // Check if store is open
-        $isStoreOpen = $this->isStoreOpen();
-        $storeHours = $this->getStoreHours();
+        // Cache store status for 5 minutes
+        $isStoreOpen = Cache::remember('store_is_open', 300, function () {
+            return $this->isStoreOpen();
+        });
+        
+        $storeHours = Cache::remember('store_hours', 300, function () {
+            return $this->getStoreHours();
+        });
         
         // Get customer to optimize favorite checking
         $customer = Auth::guard('customer')->user();
         
-        if ($customer) {
-            // Load products with customer's favorites to avoid N+1 queries
-            $products = Product::with(['favoriteMenus' => function($query) use ($customer) {
-                $query->where('customer_id', $customer->id);
-            }])->get();
-        } else {
-            $products = Product::all();
-        }
+        // Cache products for 10 minutes (or use cache tags to invalidate on updates)
+        $cacheKey = $customer ? "products_customer_{$customer->id}" : 'products_guest';
+        
+        $products = Cache::remember($cacheKey, 600, function () use ($customer) {
+            if ($customer) {
+                // Load products with customer's favorites to avoid N+1 queries
+                return Product::with(['favoriteMenus' => function($query) use ($customer) {
+                    $query->where('customer_id', $customer->id);
+                }])->get();
+            } else {
+                return Product::all();
+            }
+        });
         
         return response()->json([
             'success' => true,

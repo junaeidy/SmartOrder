@@ -10,8 +10,10 @@ class ProductAnalyticsController extends Controller
 {
     public function getTopProducts()
     {
-        // Get all completed transactions
-        $completedTransactions = Transaction::where('status', 'completed')->get();
+        // Get all completed transactions (only select needed columns)
+        $completedTransactions = Transaction::select('id', 'items')
+            ->where('status', 'completed')
+            ->get();
 
         // Process transactions to calculate total sales for each product
         $productSales = [];
@@ -37,8 +39,9 @@ class ProductAnalyticsController extends Controller
         arsort($productSales);
         $topProductIds = array_keys(array_slice($productSales, 0, 6, true));
 
-        // Get top sold product details
-        $topSoldProducts = Product::whereIn('id', $topProductIds)
+        // Get top sold product details (only select needed columns)
+        $topSoldProducts = Product::select('id', 'nama', 'harga', 'gambar')
+            ->whereIn('id', $topProductIds)
             ->get()
             ->map(function ($product) use ($productSales) {
                 $product->total_sold = $productSales[$product->id] ?? 0;
@@ -50,7 +53,8 @@ class ProductAnalyticsController extends Controller
             ->sortByDesc('total_sold')->values();
 
         // Get 6 most favorited products without GROUP BY issues (uses subquery)
-        $topFavoritedProducts = Product::withCount(['favoriteMenus as favorite_count'])
+        $topFavoritedProducts = Product::select('id', 'nama', 'harga', 'gambar')
+            ->withCount(['favoriteMenus as favorite_count'])
             ->having('favorite_count', '>', 0) // Only get products with favorites > 0
             ->orderBy('favorite_count', 'desc')
             ->take(6)

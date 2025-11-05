@@ -42,6 +42,7 @@ class Customer extends Authenticatable
      */
     protected $casts = [
         'password' => 'hashed',
+        'phone' => 'encrypted', // Encrypt phone numbers
     ];
 
     /**

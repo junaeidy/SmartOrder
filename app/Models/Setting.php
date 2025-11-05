@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Cache;
 
 class Setting extends Model
 {
@@ -28,21 +29,23 @@ class Setting extends Model
     }
     
     /**
-     * Get a setting by key
+     * Get a setting by key with caching
      */
     public static function get(string $key, $default = null)
     {
-        $setting = self::where('key', $key)->first();
-        
-        if (!$setting) {
-            return $default;
-        }
-        
-        return $setting->value;
+        return Cache::remember("setting_{$key}", 3600, function () use ($key, $default) {
+            $setting = self::where('key', $key)->first();
+            
+            if (!$setting) {
+                return $default;
+            }
+            
+            return $setting->value;
+        });
     }
     
     /**
-     * Set a setting
+     * Set a setting and clear cache
      */
     public static function set(string $key, $value, string $type = 'string', $description = null)
     {
@@ -55,6 +58,9 @@ class Setting extends Model
         }
         
         $setting->save();
+        
+        // Clear cache after updating
+        Cache::forget("setting_{$key}");
         
         return $setting;
     }
